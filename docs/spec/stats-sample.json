@@ -1,0 +1,254 @@
+{
+  "schema": "vtl-stats-dataset/1",
+  "statsVersion": "2026-10-18.1",
+  "retrievedDate": "2026-10-18",
+  "notes": "人生の位置（補助表示）用。同梱するのは論文・公開レポートなど出典と引用条件が明確な少数の実測値だけ。ユーザーローカル等の第三者ランキング・一覧サイトや個人ブログの値は参考調査であり含めない。citationTermsCheckedがtrueになったものだけを製品に同梱する。ゲーム内の値はplaceholder=true。定期更新・スクレイピングは行わない。",
+  "evidenceClasses": [
+    "statistic",
+    "estimate",
+    "placeholder"
+  ],
+  "sources": [
+    {
+      "sourceId": "M16",
+      "title": "Streams Charts「VTuber Viewership Q2 2026」",
+      "url": "https://streamscharts.com/news/vtuber-viewership-q2-2026",
+      "publishedDate": "2026-07-27",
+      "retrievedDate": "2026-10-18",
+      "definition": "Streams Charts/VSTATSが追跡した生配信VTuberチャンネル",
+      "sourceType": "public_report",
+      "reliability": "A",
+      "citationTermsChecked": false,
+      "notes": "生配信のみ"
+    },
+    {
+      "sourceId": "M18",
+      "title": "矢野経済研究所 VTuber市場調査",
+      "url": "https://www.yano.co.jp/press-release/show/press_id/3806",
+      "publishedDate": "2025",
+      "retrievedDate": "2026-10-18",
+      "definition": "国内VTuber事務所等の売上",
+      "sourceType": "public_report",
+      "reliability": "A",
+      "citationTermsChecked": false,
+      "notes": ""
+    },
+    {
+      "sourceId": "M24",
+      "title": "Wei & Tyson, WWW 2025（arXiv:2502.01553）",
+      "url": "https://arxiv.org/abs/2502.01553",
+      "publishedDate": "2025",
+      "retrievedDate": "2026-10-18",
+      "definition": "Bilibiliの約4.9千VTuber・270万セッション（2022年6月～2023年9月）。活動中VTuber数はVTBs.moeの引用",
+      "sourceType": "paper",
+      "reliability": "B",
+      "citationTermsChecked": false,
+      "notes": "中国Bilibiliのみ"
+    },
+    {
+      "sourceId": "M25",
+      "title": "Lee, Wang, Lu, CHI 2025（arXiv:2504.13421）",
+      "url": "https://arxiv.org/abs/2504.13421",
+      "publishedDate": "2025",
+      "retrievedDate": "2026-10-18",
+      "definition": "論文が引用したStreams Charts 2023年の集計",
+      "sourceType": "paper",
+      "reliability": "B",
+      "citationTermsChecked": false,
+      "notes": "二次引用"
+    }
+  ],
+  "series": [
+    {
+      "seriesId": "LP03",
+      "metric": "active_live_streaming_channels",
+      "unit": "channels",
+      "evidenceClass": "statistic",
+      "sourceIds": [
+        "M16"
+      ],
+      "points": [
+        {
+          "period": "2026-Q2",
+          "scope": "global_tracked_live_streaming_channels",
+          "value": 11300,
+          "approximate": true
+        }
+      ]
+    },
+    {
+      "seriesId": "LP05",
+      "metric": "real_world_top_share_example",
+      "evidenceClass": "estimate",
+      "formula": "threshold_share_with_lower_bound_denominator",
+      "sourceIds": [
+        "M24"
+      ],
+      "inputs": {
+        "count": 35,
+        "denominatorLowerBound": 6000,
+        "threshold": "1M_followers",
+        "scope": "Bilibili_active_vtubers"
+      },
+      "result": {
+        "topShareUpperBound": 0.0058,
+        "oneInNLowerBound": 170
+      },
+      "notes": "分母は「6,000超」の下限のため、上位割合は上限として示す"
+    },
+    {
+      "seriesId": "LP08",
+      "metric": "top_average_concurrent_viewers",
+      "unit": "viewers",
+      "evidenceClass": "statistic",
+      "sourceIds": [
+        "M16"
+      ],
+      "points": [
+        {
+          "period": "2026-Q2",
+          "range": [
+            13000,
+            18000
+          ],
+          "scope": "top_channels_only"
+        }
+      ]
+    },
+    {
+      "seriesId": "LP10",
+      "metric": "context",
+      "evidenceClass": "statistic",
+      "points": [
+        {
+          "name": "hours_watched",
+          "period": "2026-Q2",
+          "value": 482600000,
+          "unit": "hours",
+          "sourceIds": [
+            "M16"
+          ]
+        },
+        {
+          "name": "jp_market_size",
+          "period": "FY2023",
+          "value": 80000000000,
+          "unit": "JPY",
+          "sourceIds": [
+            "M18"
+          ]
+        },
+        {
+          "name": "bilibili_membership_next_month_renewal",
+          "period": "2022-06/2023-09",
+          "value": 0.089,
+          "unit": "share",
+          "sourceIds": [
+            "M24"
+          ]
+        },
+        {
+          "name": "independent_share_of_channels",
+          "period": "2023",
+          "value": 0.739,
+          "unit": "share",
+          "sourceIds": [
+            "M25"
+          ]
+        }
+      ]
+    },
+    {
+      "seriesId": "LP11",
+      "metric": "in_game_same_year_runs",
+      "evidenceClass": "placeholder",
+      "placeholder": true,
+      "runsPerYear": 1000,
+      "points": [
+        {
+          "year": 2019,
+          "subscriberQuantiles": null,
+          "status": "generated_per_build"
+        }
+      ],
+      "notes": "主表示。ゲーム内の周回分布で、版ごとに生成する。現実の統計ではない"
+    }
+  ],
+  "notBundled": {
+    "notes": "初期版の範囲外。参考調査として調査データ集にのみ記録し、製品データに含めない",
+    "seriesIds": [
+      "LP01",
+      "LP02",
+      "LP04",
+      "LP06",
+      "LP07",
+      "LP09"
+    ],
+    "referenceSourceIds": [
+      "M01",
+      "M02",
+      "M03",
+      "M04",
+      "M05",
+      "M07",
+      "M08",
+      "M09",
+      "M10"
+    ]
+  },
+  "startYearWeights": {
+    "initialVersion": {
+      "mode": "uniform",
+      "placeholder": true,
+      "weights": {
+        "2016": 1,
+        "2017": 1,
+        "2018": 1,
+        "2019": 1,
+        "2020": 1,
+        "2021": 1,
+        "2022": 1,
+        "2023": 1,
+        "2024": 1,
+        "2025": 1,
+        "2026": 1
+      }
+    },
+    "extensionCandidates": [
+      {
+        "mode": "proportional_to_debuts",
+        "includedInInitialVersion": false
+      }
+    ]
+  },
+  "lifePositionViewExample": {
+    "placeholder": true,
+    "runId": "run_sample_01",
+    "startYear": 2019,
+    "inGameSubscribers": 12300,
+    "results": [
+      {
+        "seriesId": "LP11",
+        "method": "in_game_empirical_share",
+        "topShare": null,
+        "oneInN": null,
+        "evidenceClass": "placeholder",
+        "notes": "値は版ごとの周回分布から計算する"
+      },
+      {
+        "seriesId": "LP05",
+        "display": "≈上位0.6%未満（約170人に1人より少ない）",
+        "evidenceClass": "estimate",
+        "sourceIds": [
+          "M24"
+        ]
+      }
+    ],
+    "statsVersion": "2026-10-18.1"
+  },
+  "relatedParams": {
+    "document": "vtuber-life-params-v0.5.md 第P-19節",
+    "json": "vtuber-life-params-v0.5.json collections.lifePositionIndicators",
+    "note": "指標の定義・初期版の扱いは仕様書第36.3節、表示する値と出典はパラメータ集とこのファイル（CH48）"
+  }
+}

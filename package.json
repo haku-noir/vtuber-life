@@ -1,0 +1,12 @@
+{
+  "name": "vtuber-life",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "VTuberの一生 - 一人のVTuberと中の人の人生を眺める観察型シミュレーション",
+  "scripts": {
+    "test": "node --test",
+    "start": "node scripts/serve.mjs"
+  },
+  "engines": { "node": ">=22" }
+}
