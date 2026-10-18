@@ -2,13 +2,12 @@
 # Roadmap
 
 ```text
-Position: milestone 3 of 9 (M9 in progress)
-Current milestone: M9
+Position: 3 of 9 milestones done; the next one is being planned
+Current milestone: none
 Replans used: 0 of 6
 M1 [done] Base: seeded RNG, params loader, calendar boundaries, save data, serve script
 M2 [done] Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
-M9 [in progress] Weekly auto-advance: abilities, activities, money, WeeklySnapshot, run loop
-    files: src/sim.js, src/activity.js, src/economy.js, src/params.js, docs/spec/params.json, docs/spec/para...; accept: AT03/AT07/AT09 checks pass; A video-only life and a streaming life both run to the end with no UI
+M9 [done] Weekly auto-advance: abilities, activities, money, WeeklySnapshot, run loop
 M10 [pending] Data: P-18 distributions, name ledger, BG22 rule, connect person and household
     files: docs/spec/params.json, docs/spec/params.md, src/person.js, src/setup.js, test/setup.test.mjs; accept: setup.ready is true for QS1 on all start years (AT01/AT02); Seed code round-trips through the edi...
 M11 [pending] Observation UI: weekly 3-series graph, radar, log, speed, pause
