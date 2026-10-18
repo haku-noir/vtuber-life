@@ -28,3 +28,7 @@ M16 (rework of M10) landed in 1 commit (c9abad2294) touching only docs/DECISIONS
 ## M11 Observation UI: weekly 3-series graph, radar, log, speed, pause
 
 M11 landed in 1 commit (564a62b0d5) touching web/index.html, app.js, graph.js, style.css, test/ui.test.mjs and DECISIONS. It added the observation UI: a weekly 3-series graph, an ability radar, a log, speed control and pause. Verification passed 2 times. Review passed with 4 minor findings (handler errors not shown, no guard for RESULT with no snapshots, hardcoded radar labels), 0 blockers and 0 fix rounds.
+
+## M18 Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ...
+
+M18 (rework of M10) landed in 1 commit (5fed88407a) touching docs/DECISIONS.md, docs/spec/params.json, params.md and test/setup.test.mjs. It recorded the q15 answer: the BG22 15% who are not partnered are single parents living with their children. It also updated the params basis to a placeholder that is not a statistic, and added a regression test. Verification passed 2 times (npm test). Review passed with 3 minor findings (the test depends on seeds 8/9 hitting specific branches, and it asserts on basis wording), 0 blockers and 0 fix rounds.

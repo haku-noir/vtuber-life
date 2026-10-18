@@ -2,8 +2,8 @@
 # Roadmap
 
 ```text
-Position: 8 of 12 milestones done; the next one is being planned
-Current milestone: none
+Position: milestone 9 of 12 (M12 in progress)
+Current milestone: M12
 Replans used: 0 of 6
 M1 [done] Base: seeded RNG, params loader, calendar boundaries, save data, serve script
 M2 [done] Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
@@ -13,7 +13,7 @@ M17 [done] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect per
 M16 [done] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ... (rework)
 M11 [done] Observation UI: weekly 3-series graph, radar, log, speed, pause
 M18 [done] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ... (rework)
-M12 [pending] Events and major choices, heavy events with support notice, marriage/family
+M12 [in progress] Events and major choices, heavy events with support notice, marriage/family
     files: src/events.js, src/household.js, test/events.test.mjs; accept: AT04/AT06 when resuming a pending choice; EV93-96 tests; Heavy events are never removed or reduced
 M13 [pending] Dreams, epilogue, life record, alternate-era comparison
     files: src/dreams.js, src/epilogue.js, src/compare.js, test/dreams.test.mjs; accept: Dream ATs in 22.3 and AT12/AT13/AT16 pass
