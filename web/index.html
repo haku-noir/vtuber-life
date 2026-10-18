@@ -20,6 +20,7 @@
       <button id="start" class="primary" disabled>生まれる（おまかせで始める）</button>
       <p id="loading" role="status">人生の準備をしています…</p>
       <p class="muted">入力は不要です。人物とVの設定は自動で決まります。</p>
+      <label><input id="lp-enabled" type="checkbox" checked> 人生の位置（補助表示）を利用する</label>
       <details class="seed-option"><summary>同じたねで始める</summary><label for="seed">たね（同じ版・同じたねで同じ人生）</label><input id="seed" type="text" maxlength="200" autocomplete="off" placeholder="空欄のままでも始められます"></details>
     </section>
     <section id="observation" hidden>
@@ -45,6 +46,12 @@
         <section class="panel" aria-labelledby="life-heading"><h2 id="life-heading">いまの暮らし</h2><dl class="metrics"><div><dt>登録者</dt><dd id="subscribers"></dd></div><div><dt>公開した作品</dt><dd id="work-count"></dd></div><div><dt>生活資金</dt><dd id="funds"></dd></div><div><dt>うち確保済み制作費</dt><dd id="reserved"></dd></div><div><dt>生活費の不足累計</dt><dd id="unmet"></dd></div><div><dt>疲労</dt><dd id="fatigue"></dd></div></dl><p class="caption">金額・疲労はゲーム内の簡略モデルです。</p><p class="quiet-note">いまの活動を楽しんでいる<br><span class="muted">夢は決めずに始めています。</span></p><details id="seed-detail" data-pause><summary>この人生のたねを読む（進行を停止）</summary><p id="seed-used" class="seed-text"></p></details></section>
       </div>
       <section class="panel" aria-labelledby="logs-heading"><h2 id="logs-heading">積み重なる記録</h2><p class="caption">開いている間は進行を止めます。続きを見るには「最新へ戻って再開」を押してください。</p><div class="two-column"><details id="activity-detail" data-pause><summary>VTuberとしての出来事・作品</summary><ol id="activity-log" class="log"></ol></details><details id="life-detail" data-pause><summary>中の人の暮らし・月の収支</summary><ol id="life-log" class="log"></ol></details></div></section>
+      <p><button id="lp-open" disabled>人生の位置（補助表示）</button> <span class="caption">一時停止中・観察終了後に開けます。</span></p>
+    </section>
+    <section id="life-position" class="panel" aria-labelledby="lp-heading" hidden>
+      <h1 id="lp-heading" tabindex="-1">人生の位置（補助表示）</h1>
+      <div id="lp-content"></div>
+      <div class="controls"><button id="lp-methods">出典と方法を見る</button><button id="lp-close">閉じる</button></div>
     </section>
     <footer>表示する人物・活動・記録はフィクションです。</footer>
   </main>

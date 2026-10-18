@@ -1,4 +1,5 @@
 import { loadParams } from "../src/params.js";
+import { mountLifePosition, canOpenLifePosition } from "./lifeposition.js";
 import { createSetup } from "../src/setup.js";
 import { createSimulation, advanceToBoundary, setPaused } from "../src/sim.js";
 import { addMonths, daysBetween, nextBoundary } from "../src/calendar.js";
@@ -15,7 +16,7 @@ export function createObservationController(params, { seed, initialRun,
   let timer = null, generation = 0, disposed = false;
   const view = { speed: 1, windowWeeks: settings.defaultWeeks, followLatest: true,
     endWeekIndex: null, selectedWeek: null, visible: { S: true, C: true, G: true }, hidden: false,
-    detailOpen: false };
+    detailOpen: false, lifePositionOpen: false };
   const details = new Set();
   const notify = () => onChange();
   function stopClock() {
@@ -24,7 +25,7 @@ export function createObservationController(params, { seed, initialRun,
     timer = null;
   }
   function active() {
-    return !disposed && !view.hidden && !view.detailOpen && view.followLatest &&
+    return !disposed && !view.hidden && !view.detailOpen && !view.lifePositionOpen && view.followLatest &&
       run.state === "RUNNING" && !run.pendingDecision;
   }
   function arm() {
@@ -61,11 +62,18 @@ export function createObservationController(params, { seed, initialRun,
     start() { notify(); arm(); },
     pause,
     resume() {
-      if (disposed || view.hidden) return;
+      if (disposed || view.hidden || view.lifePositionOpen) return;
       details.clear(); view.detailOpen = false;
       view.followLatest = true; view.endWeekIndex = null; view.selectedWeek = null;
       run = setPaused(params, run, false);
       notify(); arm();
+    },
+    setLifePositionOpen(open) {
+      if (open && (disposed || !canOpenLifePosition(run.state))) return false;
+      view.lifePositionOpen = Boolean(open);
+      if (open) stopClock();
+      notify();
+      return true;
     },
     setSpeed(speed) {
       if (!settings.speeds.includes(speed)) throw new RangeError("Unsupported observation speed");
@@ -105,6 +113,7 @@ export async function mountApp(document) {
   const $ = id => document.getElementById(id);
   const start = $("start"), errorBox = $("error");
   let controller = null;
+  mountLifePosition(document, { getController: () => controller });
   const showError = error => {
     errorBox.textContent = `読み込み・進行を止めました。${error.message}。ページを再読み込みしてお試しください。`;
     errorBox.hidden = false;
@@ -125,7 +134,8 @@ export async function mountApp(document) {
     const occupation = background?.columns["経歴・職業の種類"] ?? background?.columns["経歴・職業の類型"] ?? person.background;
     $("profile").textContent = `${person.startYear}年開始 · 開始時${person.age}歳 · ${occupation} · ${FORMATS[run.policy.format]}中心`;
     $("pause").disabled = run.state !== "RUNNING";
-    $("resume").disabled = view.hidden || !["RUNNING", "PAUSED"].includes(run.state) || Boolean(run.pendingDecision);
+    $("resume").disabled = view.hidden || view.lifePositionOpen || !["RUNNING", "PAUSED"].includes(run.state) || Boolean(run.pendingDecision);
+    $("lp-open").disabled = !canOpenLifePosition(run.state);
     $("speed").value = String(view.speed);
     $("window").value = String(view.windowWeeks);
     for (const key of ["S", "C", "G"]) $("series-" + key).setAttribute("aria-pressed", String(view.visible[key]));

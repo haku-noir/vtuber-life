@@ -1,4 +1,14 @@
 :root { font-family: system-ui, sans-serif; color: #263d3e; background: #f5f5ef; line-height: 1.7; --accent: #25675d; --subscribers: #22675f; --concurrent: #785584; --gain: #c4aa68; }
+.lp-disclaimer { position: sticky; top: 0; z-index: 1; padding: 12px; background: #f1f3ed; border: 1px solid #acb9b1; }
+.evidence-badge { display: inline-block; padding: 1px 8px; border: 2px solid; border-radius: 4px; font-size: .85rem; }
+.evidence-statistic { color: #245987; border-style: solid; background: #eef5fc; }
+.evidence-estimate { color: #85501a; border-style: dashed; background: #fff6e6; }
+.evidence-placeholder { color: #4e5557; border-color: #777; background: repeating-linear-gradient(135deg, #eee, #eee 4px, #fafafa 4px, #fafafa 8px); }
+.lp-table { overflow-x: auto; }
+.lp-table td { min-width: 160px; overflow-wrap: anywhere; }
+.lp-group { margin: 20px 0; border-bottom: 1px solid #acb9b1; }
+#life-position { margin-top: 24px; }
+#life-position a { overflow-wrap: anywhere; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; }
