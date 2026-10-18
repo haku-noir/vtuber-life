@@ -27,7 +27,8 @@ function table(headers, rows) {
 }
 export function renderLifePosition(view, methods = false) {
   const disclaimer = `<p class="lp-disclaimer">${DISCLAIMER}</p>`;
-  const version = `<p>statsVersion: ${e(view.statsVersion)}${view.versionMismatch ? ` ／ 保存時の版 ${e(view.savedStatsVersion)}とは異なります` : ""}</p>`;
+  const versionLabel = value => value === "not-loaded" ? "未取得" : e(value);
+  const version = `<p>統計データの版: ${versionLabel(view.statsVersion)}${view.versionMismatch ? ` ／ 保存時の版 ${versionLabel(view.savedStatsVersion)}とは異なります` : ""}</p>`;
   if (methods) {
     const sources = table(["出典ID・題名・URL", "公表日・取得日", "定義・信頼度・注意"], view.sources.map(source => [
       `${e(source.sourceId)} ${sourceLink(source)}`,
@@ -49,14 +50,14 @@ export function renderLifePosition(view, methods = false) {
       <p>割合 p の逆数を約N人に1人とし、Nが10以上は有効数字2桁、10未満は整数に丸めます。割合が50%を超える場合や最初の区間は「最も多い範囲」と表示します。</p>
       <h3>ゲーム内の周回分布の作り方</h3><p>${generation}</p>${version}`;
   }
-  return disclaimer + version + `<p>${e(view.startYear)}年に開始 ／ いま登録者 ${number(view.subscribers)}人（ゲーム内）</p>
+  return disclaimer + `<p>${e(view.startYear)}年に開始 ／ いま登録者 ${number(view.subscribers)}人（ゲーム内）</p>
     ${view.status === "unavailable" ? '<p role="status">未取得。統計データを読み込めませんでした。</p>' : ""}
     <details open class="lp-group"><summary>ゲーム内の同じ年の人生</summary><p>${badge("placeholder")} ${e(view.main.display)}</p>
       <p class="caption">${view.main.runs ? `${view.main.runs}周回との比較。現実の統計ではありません。` : "同じ開始年・同じ版の周回分布は未取得です。"}</p></details>
     <details open class="lp-group"><summary>現実の文脈（参考）</summary>${view.context.length ? view.context.map(item =>
       `<p>${badge(item.evidenceClass)} ${e(LABELS[item.seriesId])} ${e(NAMES[item.name] ?? "")}：${e(contextValue(item))}<br>
       <span class="caption">${e(item.period ?? item.inputs?.scope ?? "")} ［${e(item.sourceIds.join(", "))}］</span></p>`).join("") :
-      "<p>表示できる数値はありません。出典名とURLは「出典と方法」で確認できます。</p>"}</details>`;
+      "<p>表示できる数値はありません。出典名とURLは「出典と方法」で確認できます。</p>"}</details>${version}`;
 }
 
 // Local screen state only. A rejected/failed read never reaches the game error handler.

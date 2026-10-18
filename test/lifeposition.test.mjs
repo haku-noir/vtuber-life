@@ -110,15 +110,15 @@ test("AT123/AT124: permanent disclaimer, accessible badges, version notice and l
     const html = renderLifePosition(view, methods);
     assert.ok(html.startsWith('<p class="lp-disclaimer">' + DISCLAIMER + '</p>'));
     assert.doesNotMatch(html, /下位|負け|失敗|dismiss|close-disclaimer/);
-    assert.ok(html.includes(`statsVersion: ${view.statsVersion}`));
+    assert.ok(html.endsWith(`<p>統計データの版: ${view.statsVersion} ／ 保存時の版 oldとは異なります</p>`));
     assert.ok(html.includes("保存時の版 oldとは異なります"));
     const matching = computeLifePosition(parse(checked()), { ...value, versions: { statsVersion: view.statsVersion } });
     const matchingHtml = renderLifePosition(matching, methods);
-    assert.ok(matchingHtml.includes(`statsVersion: ${view.statsVersion}`));
+    assert.ok(matchingHtml.endsWith(`<p>統計データの版: ${view.statsVersion}</p>`));
     assert.ok(!matchingHtml.includes("とは異なります"));
   }
   const methods = renderLifePosition(view, true);
-  for (const word of ["信頼度", "計算式", "取得日", "シード", "statsVersion", "保存時の版 oldとは異なります"])
+  for (const word of ["信頼度", "計算式", "取得日", "シード", "統計データの版", "保存時の版 oldとは異なります"])
     assert.ok(methods.includes(word));
   const css = await readFile(new URL("../web/style.css", import.meta.url), "utf8");
   assert.match(css, /evidence-statistic[^}]*solid/);
@@ -133,6 +133,24 @@ test("AT123/AT124: permanent disclaimer, accessible badges, version notice and l
   assert.equal(called, 1);
   assert.equal((await loadStatsDataset(async () => { throw new Error("missing"); })).status, "unavailable");
   assert.equal((await loadStatsDataset(async () => "{}")).status, "unavailable");
+});
+
+test("AT124/AT125: unavailable versions use Japanese labels at the end of both views", async () => {
+  const failed = await loadStatsDataset(async () => { throw new Error("offline"); });
+  const unavailable = computeLifePosition(failed.dataset, value);
+  const unsaved = computeLifePosition(parse(raw), { ...value, versions: { statsVersion: "not-loaded" } });
+  for (const methods of [false, true]) {
+    for (const [view, expected] of [
+      [unavailable, "<p>統計データの版: 未取得</p>"],
+      [unsaved, `<p>統計データの版: ${raw.statsVersion} ／ 保存時の版 未取得とは異なります</p>`],
+    ]) {
+      const html = renderLifePosition(view, methods);
+      assert.ok(html.startsWith(`<p class="lp-disclaimer">${DISCLAIMER}</p>`));
+      assert.ok(html.endsWith(expected));
+      assert.equal(html.split("統計データの版:").length - 1, 1);
+      assert.doesNotMatch(html, /not-loaded/);
+    }
+  }
 });
 
 test("AT125: opening/closing and failed stats reads leave simulation, RNG, dreams and save unchanged", async () => {
@@ -202,7 +220,7 @@ test("AT124/AT125: reopening retries failed reads, including failures after clos
         }
         await $("lp-open").handlers.click();
         assert.equal(loads, 2);
-        assert.ok($("lp-content").innerHTML.includes(`statsVersion: ${dataset.statsVersion}`));
+        assert.ok($("lp-content").innerHTML.includes(`統計データの版: ${dataset.statsVersion}`));
         assert.ok(!$("lp-content").innerHTML.includes("統計データを読み込めませんでした"));
         $("lp-close").handlers.click();
         await $("lp-open").handlers.click();
@@ -243,7 +261,7 @@ test("AT123/AT125: UI reads lazily, hides behind preference, confirms links, and
   await $("lp-open").handlers.click();
   assert.equal(loads, 1);
   $("lp-methods").handlers.click();
-  assert.match($("lp-content").innerHTML, /statsVersion/);
+  assert.match($("lp-content").innerHTML, /統計データの版/);
   let prevented = false;
   $("lp-content").handlers.click({ target: { closest: () => ({}) }, preventDefault() { prevented = true; } });
   assert.equal(prevented, true);
