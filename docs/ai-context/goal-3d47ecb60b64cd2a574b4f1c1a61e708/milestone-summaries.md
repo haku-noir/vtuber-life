@@ -12,3 +12,7 @@ M2 landed in 2 commits (aec08f95fb, 9cd3214c75) touching person.js, seedcode.js,
 ## M9 Weekly auto-advance: abilities, activities, money, WeeklySnapshot, run loop
 
 M9 landed in 1 commit (e890942f84) touching sim.js, activity.js, economy.js, params.js, params.json/md, DECISIONS and sim tests. It added a weekly auto-advance with abilities, activities, money, WeeklySnapshot and the run loop, driven by createSimulation using explicit person and run-setup templates. Verification passed 2 times; review passed with 3 minor findings, 0 blockers and 0 fix rounds.
+
+## M10 Data: P-18 distributions, name ledger, BG22 rule, connect person and household
+
+M10 landed in 1 commit (f0857bc002) touching DECISIONS, params.json/md, person.js, setup.js and setup tests. It added the P-18 distributions (age as a truncated normal: 18-45, mean 25, sd 6, from params), the name ledger and the BG22 rule (unmarried 15% become single parents), and connected person generation to the household. Verification passed 2 times; review passed with 4 minor findings, 0 blockers and 0 fix rounds.
