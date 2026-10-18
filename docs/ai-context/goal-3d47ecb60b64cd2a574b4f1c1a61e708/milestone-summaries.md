@@ -24,3 +24,7 @@ M17 (rework of M10) landed in 1 commit (b476af05b3) touching DECISIONS, params.j
 ## M16 Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ...
 
 M16 (rework of M10) landed in 1 commit (c9abad2294) touching only docs/DECISIONS.md. It recorded decisions and notes for the P-18/name ledger/BG22 rework. Verification passed 2 times (npm test). Review passed with 1 finding, 0 blockers and 0 fix rounds.
+
+## M11 Observation UI: weekly 3-series graph, radar, log, speed, pause
+
+M11 landed in 1 commit (564a62b0d5) touching web/index.html, app.js, graph.js, style.css, test/ui.test.mjs and DECISIONS. It added the observation UI: a weekly 3-series graph, an ability radar, a log, speed control and pause. Verification passed 2 times. Review passed with 4 minor findings (handler errors not shown, no guard for RESULT with no snapshots, hardcoded radar labels), 0 blockers and 0 fix rounds.
