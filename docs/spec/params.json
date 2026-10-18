@@ -1,6 +1,7 @@
 {
  "schemaVersion": "params-0.5.0",
  "contentVersion": "0.5.0",
+ "balanceVersion": "balance-0.2.0",
  "specDocument": "vtuber-life-spec-v0.5.md",
  "generatedFrom": "vtuber-life-params-v0.5.md",
  "note": "表の列名は日本語のまま保持する。値の正はMarkdown版と同一。weightのnullは未設定（第20章の調整で決める仮置き）。",
@@ -13,6 +14,22 @@
   "ゲーム設定（v0.4）": "v0.4以前から継続"
  },
  "collections": {
+  "simBalance": {
+   "evidenceClass": "仮置き",
+   "basis": "週次シミュレーションのゲーム調整値。実在の人数・単価・成功率ではない。P-22参照。",
+   "ability": { "min": 0, "max": 100, "practiceGainPerHour": 0.025, "lessonGainPerHour": 0.15 },
+   "time": { "restHoursPerDay": 9, "lifeHoursPerDay": 4, "fatiguePerHour": 0.3, "recoveryPerDay": 1.5, "fatigueLimit": 100, "maxFatigueReduction": 0.8 },
+   "lesson": { "monthlyCostYen": 8000, "monthlyHours": 4 },
+   "audience": { "uniqueReachRatio": 0.55, "overlapRatio": 0.35, "subscribeRate": 0.025, "dailyChurnRate": 0.0003, "regularRetention": 0.995, "regularConversion": 0.02, "attendanceMin": 0.1, "attendanceMax": 0.7, "walkInMax": 8, "commentRate": 0.008 },
+   "discovery": { "dailyReach": 55, "qualityFloor": 0.4, "decayDays": 28, "tailRatio": 0.025, "rediscoveryAfterDays": 21, "rediscoveryDailyChance": 0.0004, "rediscoveryMultiplier": 25, "variationMin": 0.1, "variationMax": 2 },
+   "money": { "adYenPerView": 0.15, "supportYenPerViewerHour": 1.5, "receiptShare": 0.8 },
+   "formats": {
+    "video": { "productionHours": 24, "productionCostYen": 1000, "productionShare": 0.85, "streamShare": 0, "practiceShare": 0.15, "streamSessionHours": 3, "streamPreparationHours": 1, "reachMultiplier": 1, "abilityWeights": { "singing": 0, "drawing": 0.1, "dance": 0, "gaming": 0.1, "talk": 0.1, "collaboration": 0, "planning": 0.3, "editing": 0.4 } },
+    "shorts": { "productionHours": 8, "productionCostYen": 200, "productionShare": 0.9, "streamShare": 0, "practiceShare": 0.1, "streamSessionHours": 3, "streamPreparationHours": 1, "reachMultiplier": 2, "abilityWeights": { "singing": 0, "drawing": 0.1, "dance": 0.1, "gaming": 0.1, "talk": 0.2, "collaboration": 0, "planning": 0.2, "editing": 0.3 } },
+    "music": { "productionHours": 160, "productionCostYen": 5000, "productionShare": 0.75, "streamShare": 0, "practiceShare": 0.25, "streamSessionHours": 3, "streamPreparationHours": 1, "reachMultiplier": 2, "abilityWeights": { "singing": 0.5, "drawing": 0, "dance": 0, "gaming": 0, "talk": 0, "collaboration": 0, "planning": 0.2, "editing": 0.3 } },
+    "stream": { "productionHours": 40, "productionCostYen": 500, "productionShare": 0.2, "streamShare": 0.65, "practiceShare": 0.15, "streamSessionHours": 2, "streamPreparationHours": 1, "reachMultiplier": 0.6, "abilityWeights": { "singing": 0, "drawing": 0, "dance": 0, "gaming": 0.2, "talk": 0.4, "collaboration": 0.2, "planning": 0.1, "editing": 0.1 } }
+   }
+  },
   "personaStyles": [
    {
     "id": "PT01",

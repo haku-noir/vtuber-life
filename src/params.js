@@ -1,5 +1,7 @@
 export const PARAMS_SCHEMA_VERSION = "params-0.5.0";
 export const CONTENT_VERSION = "0.5.0";
+export const BALANCE_VERSION = "balance-0.2.0";
+export const ABILITY_AXES = Object.freeze(["singing", "drawing", "dance", "gaming", "talk", "collaboration", "planning", "editing"]);
 export const PARAMS_URL = new URL("../docs/spec/params.json", import.meta.url);
 
 const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -103,7 +105,51 @@ export function validateParams(data) {
   for (const level of Object.values(levels))
     if (typeof level !== "number" || !Number.isFinite(level) || level < 0) fail("compatibility weight");
   getObservationMonths(data);
+  getSimBalance(data);
   return data;
+}
+
+// All tuning values, including format allocation and growth, come from P-22.
+export function getSimBalance(params) {
+  const b = params?.collections?.simBalance;
+  if (params?.balanceVersion !== BALANCE_VERSION || !isObject(b) || b.evidenceClass !== "仮置き" ||
+      typeof b.basis !== "string" || !b.basis.length) fail("simulation balance version/evidence");
+  function numbers(object, keys, max = 1e9) {
+    if (!isObject(object) || Object.keys(object).length !== keys.length) fail("balance fields");
+    for (const key of keys) if (typeof object[key] !== "number" || !Number.isFinite(object[key]) ||
+        object[key] < 0 || object[key] > max) fail(`balance ${key}`);
+  }
+  numbers(b.ability, ["min", "max", "practiceGainPerHour", "lessonGainPerHour"]);
+  if (b.ability.min !== 0 || b.ability.max !== 100) fail("radar scale");
+  numbers(b.time, ["restHoursPerDay", "lifeHoursPerDay", "fatiguePerHour", "recoveryPerDay", "fatigueLimit", "maxFatigueReduction"]);
+  if (b.time.restHoursPerDay + b.time.lifeHoursPerDay > 24 || b.time.fatigueLimit <= 0 || b.time.maxFatigueReduction > 1)
+    fail("time budget");
+  numbers(b.lesson, ["monthlyCostYen", "monthlyHours"]);
+  if (!Number.isSafeInteger(b.lesson.monthlyCostYen) || b.lesson.monthlyHours > 24 * 28) fail("lesson budget");
+  numbers(b.audience, ["uniqueReachRatio", "overlapRatio", "subscribeRate", "dailyChurnRate", "regularRetention",
+    "regularConversion", "attendanceMin", "attendanceMax", "walkInMax", "commentRate"]);
+  for (const [key, value] of Object.entries(b.audience)) if (key !== "walkInMax" && value > 1) fail(`audience ratio ${key}`);
+  if (!Number.isSafeInteger(b.audience.walkInMax) || b.audience.attendanceMin > b.audience.attendanceMax) fail("attendance range");
+  numbers(b.discovery, ["dailyReach", "qualityFloor", "decayDays", "tailRatio", "rediscoveryAfterDays", "rediscoveryDailyChance",
+    "rediscoveryMultiplier", "variationMin", "variationMax"]);
+  if (b.discovery.decayDays <= 0 || b.discovery.qualityFloor > 1 || b.discovery.tailRatio > 1 ||
+      b.discovery.rediscoveryDailyChance > 1 || b.discovery.variationMin > b.discovery.variationMax) fail("discovery range");
+  numbers(b.money, ["adYenPerView", "supportYenPerViewerHour", "receiptShare"]);
+  if (b.money.receiptShare > 1) fail("receipt share");
+  const formats = ["video", "shorts", "music", "stream"];
+  if (!isObject(b.formats) || Object.keys(b.formats).length !== formats.length) fail("activity formats");
+  for (const key of formats) {
+    const f = b.formats[key];
+    if (!isObject(f)) fail(`format ${key}`);
+    const { abilityWeights, ...values } = f;
+    numbers(values, ["productionHours", "productionCostYen", "productionShare", "streamShare", "practiceShare",
+      "streamSessionHours", "streamPreparationHours", "reachMultiplier"]);
+    numbers(abilityWeights, ABILITY_AXES, 1);
+    if (f.productionHours < 1 || f.streamSessionHours < 1 || !Number.isSafeInteger(f.productionCostYen) ||
+        Math.abs(f.productionShare + f.streamShare + f.practiceShare - 1) > 1e-9 ||
+        Math.abs(Object.values(abilityWeights).reduce((a, v) => a + v, 0) - 1) > 1e-9) fail(`format budget ${key}`);
+  }
+  return b;
 }
 
 export function parseParams(text) {

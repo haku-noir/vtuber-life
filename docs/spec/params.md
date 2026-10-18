@@ -710,3 +710,38 @@
 別れた場合、婚姻していれば別居・離婚を事実として短く記録し、子供がいれば育児負荷の分担比を本人側に寄せる（0.6～1.0、仮置き）。
 
 **EV96の選択肢**：元の頻度で復帰／頻度・時間帯を変えて復帰（−20～−50%）／休止を3～6か月延ばす／卒業を考える（EV27へ）。
+
+## P-22　週次シミュレーションの調整値（M9）
+
+JSONは `collections.simBalance`、版はルートの `balanceVersion: balance-0.2.0`。本節の全数値は**仮置きのゲーム設定**で、現実の人数・単価・成功率・人口分布ではない。P-18の未決人物分布を補完しない。P-21の家族イベントとは別の調整表である。
+
+| JSONグループ | 値（キー順） | 用途 |
+| --- | --- | --- |
+| ability | min=0, max=100, practiceGainPerHour=0.025, lessonGainPerHour=0.15 | 8軸の尺度、経験とボイトレの時間当たり増分。上限への残距離率を掛ける |
+| time | restHoursPerDay=9, lifeHoursPerDay=4, fatiguePerHour=0.3, recoveryPerDay=1.5, fatigueLimit=100, maxFatigueReduction=0.8 | 本業・ケア・生活・休養後の時間を使用。疲労は技術値を下げず活動可能量を減らす |
+| lesson | monthlyCostYen=8000, monthlyHours=4 | 継続ボイトレ。資金または時間不足ならその月は見送り、方針は保持 |
+| audience | uniqueReachRatio=0.55, overlapRatio=0.35, subscribeRate=0.025, dailyChurnRate=0.0003 | 再生から到達人数を見積もり、チャンネル内重複を引いて登録判定。解除は別計算 |
+| audience | regularRetention=0.995, regularConversion=0.02, attendanceMin=0.1, attendanceMax=0.7, walkInMax=8, commentRate=0.008 | 常連の再訪、配信参加と新規視聴、作品コメント。登録者への固定率で同接を計算しない |
+| discovery | dailyReach=55, qualityFloor=0.4, decayDays=28, tailRatio=0.025 | 初動と指数減衰・旧作の継続流入。技術から算出する品質だけでは結果を決めない |
+| discovery | rediscoveryAfterDays=21, rediscoveryDailyChance=0.0004, rediscoveryMultiplier=25, variationMin=0.1, variationMax=2 | 作品・相対日キーの発見機会。確率の基準期間は1日で、分割境界の数には依存しない |
+| money | adYenPerView=0.15, supportYenPerViewerHour=1.5, receiptShare=0.8 | 広告・配信支援の架空売上と本人受取。会員・案件・販売は未接続のため0 |
+
+形式ごとのJSONは `formats.<format>`。時間は時間単位、制作費は円。配分は制作・配信（準備を含む）・練習の順で、合計1。配信OFFの配分は休養に残す。
+
+| format | productionHours | productionCostYen | productionShare / streamShare / practiceShare | streamSessionHours / streamPreparationHours | reachMultiplier |
+| --- | --- | --- | --- | --- | --- |
+| video | 24 | 1000 | 0.85 / 0 / 0.15 | 3 / 1 | 1 |
+| shorts | 8 | 200 | 0.9 / 0 / 0.1 | 3 / 1 | 2 |
+| music | 160 | 5000 | 0.75 / 0 / 0.25 | 3 / 1 | 2 |
+| stream | 40 | 500 | 0.2 / 0.65 / 0.15 | 2 / 1 | 0.6 |
+
+`abilityWeights` は固定8軸（歌唱 singing、画力 drawing、身体表現 dance、ゲーム gaming、トーク talk、掛け合い collaboration、企画 planning、編集 editing）の順。品質と経験配分へ同じ係数を使い、各行の合計は1。Vの種族・一人称・肩書き等は加算しない。
+
+| format | singing | drawing | dance | gaming | talk | collaboration | planning | editing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| video | 0 | 0.1 | 0 | 0.1 | 0.1 | 0 | 0.3 | 0.4 |
+| shorts | 0 | 0.1 | 0.1 | 0.1 | 0.2 | 0 | 0.2 | 0.3 |
+| music | 0.5 | 0 | 0 | 0 | 0 | 0 | 0.2 | 0.3 |
+| stream | 0 | 0 | 0 | 0.2 | 0.4 | 0.2 | 0.1 | 0.1 |
+
+月初・最初の観測日に本業収入、生活費、制作1件分の確保、任意レッスンの順で計画する。初月と最終月の固定額・レッスン時間は観測日数／当該暦月の日数で按分する。制作費は公開時に一度だけ支出し、月末には収入源別売上と分配後受取をそれぞれ切り捨てて精算する。生活資金は整数円・非負、不足生活費は別記録とする。支払い・公開に使う期間は `[開始日, 終了日)`。
