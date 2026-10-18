@@ -65,7 +65,31 @@ function textCandidates(params, field) {
     .filter(row => !/その他|名前呼び|役割名|ファンネームで呼ぶ|独自の語尾/u.test(row.label));
 }
 
-function automatic(params, field, seed, current, rerolled = false) {
+function dataCandidates(params, field, person) {
+  const data = params.collections.initialWeights.vDefaults;
+  let rows = field === "name" ? data.nameLedger.candidates.filter(row =>
+    row.status === "APPROVED_FOR_RELEASE" || (!data.nameLedger.releaseReady && row.status === "DRAFT"))
+    : data.candidates[field] ?? [];
+  if (field === "mainActivity" && person) rows = rows.filter(row =>
+    person.startYear >= row.minYear && person.startYear <= row.maxYear);
+  return rows;
+}
+
+function resolvedValue(params, field, value) {
+  if (value?.custom != null) return value.custom;
+  const data = dataCandidates(params, field).find(row => row.id === value?.preset);
+  if (data) return clone(data.value);
+  const text = textCandidates(params, field).find(row => row.id === value?.preset);
+  return text ? text.label : clone(value);
+}
+
+// Presets remain compact IDs in the editor/seed code. Renderable content is
+// resolved separately, without copying research columns or public examples.
+function resolvedV(params, values) {
+  return Object.fromEntries(fields.map(field => [field, resolvedValue(params, field, values[field])]));
+}
+
+function automatic(params, field, seed, current, rerolled = false, person) {
   const rng = createRng(seed, "setupV", field);
   if (field === "personaStyle") return { primary: null, secondary: null };
   if (Object.hasOwn(collectionFields, field)) {
@@ -96,21 +120,24 @@ function automatic(params, field, seed, current, rerolled = false) {
     });
     return preset(rng.weighted(candidates, weights).id);
   }
-  // Source rows say 'automatic' but supply no candidate records. Never use the
-  // instruction itself as a character name, greeting or biography.
-  return null;
+  const rows = dataCandidates(params, field, person);
+  if (!rows.length) throw new TypeError(`Missing automatic candidates: ${field}`);
+  const weights = rows.map(row => row.weight.value * (field === "mainActivity" &&
+    row.backgroundIds.includes(person.background) ? row.affinityMultiplier : 1));
+  return preset(rng.weighted(rows, weights).id);
 }
 
 function cleanCustom(params, field, text) {
   const row = csRow(params, field);
-  const limit = row && /(?:最大|～)(\d+)文字/u.exec(row.columns.自由入力);
+  const limit = field === "name" ? [null, params.collections.initialWeights.vDefaults.customLimits.name] :
+    row && /(?:最大|～)(\d+)文字/u.exec(row.columns.自由入力);
   if (!limit || typeof text !== "string") throw new TypeError(`No free-text definition: ${field}`);
   const cleaned = text.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, "").replace(/(?:https?:\/\/|www\.)\S+/giu, "").trim();
   if (!cleaned.length || [...cleaned].length > Number(limit[1])) throw new TypeError(`Invalid free-text length: ${field}`);
   return cleaned;
 }
 
-function checkedOverride(params, field, value) {
+function checkedOverride(params, field, value, person) {
   fieldCheck(field);
   if (field === "personaStyle") {
     if (!value || Object.keys(value).some(key => !["primary", "secondary"].includes(key))) throw new TypeError("Invalid persona style");
@@ -125,7 +152,8 @@ function checkedOverride(params, field, value) {
     if (value.preset != null || value.formerTitle != null) throw new TypeError("Free text cannot carry a hidden preset");
     return { preset: null, custom: cleanCustom(params, field, value.custom) };
   }
-  const candidates = Object.hasOwn(collectionFields, field) ? getCandidates(params, collectionFields[field]) : textCandidates(params, field);
+  const candidates = Object.hasOwn(collectionFields, field) ? getCandidates(params, collectionFields[field]) :
+    [...textCandidates(params, field), ...dataCandidates(params, field, person)];
   if (!candidates.some(row => row.id === value.preset) || value.preset === "SP17") throw new TypeError(`Unknown candidate: ${field}`);
   if (field === "statusV") {
     const formerTitle = value.formerTitle ?? null;
@@ -142,9 +170,9 @@ function vProvenance(params, values, overrides) {
   return Object.fromEntries(fields.map(field => {
     const row = csRow(params, field);
     const rule = targets[field] ? initialRule(params, targets[field]) : row ?
-      { 区分: "仮置き", "重み・値": row.columns.プリセット } : { 区分: "仮置き", "重み・値": "生成データ未定義" };
+      { 区分: "仮置き", "重み・値": row.columns.プリセット } : { 区分: "仮置き", "重み・値": "P-18 vDefaults" };
     return [field, provenance(values[field], rule, Object.hasOwn(overrides, field) ? "player" : values[field] === null ? "unresolved" :
-      ["species", "occupationV", "statusV", "firstPerson"].includes(field) ? "random_consistent" : ["personaStyle", "catchphrase"].includes(field) ? "default" : "uniform", Object.hasOwn(overrides, field))];
+      ["species", "occupationV", "statusV", "firstPerson"].includes(field) ? "random_consistent" : ["personaStyle", "catchphrase"].includes(field) ? "default" : field === "mainActivity" ? "background_era_weighted" : "weighted", Object.hasOwn(overrides, field))];
   }));
 }
 
@@ -162,15 +190,15 @@ function editor(params, record, initialEntry) {
   if (params.contentVersion !== record.versions.contentVersion) throw new TypeError("Setup content version mismatch");
   const fixedPerson = generatePerson(params, record.personSeed);
   let state = clone(record), values = {}, history = [];
-  for (const key of Object.keys(state.overrides)) state.overrides[key] = checkedOverride(params, key, state.overrides[key]);
-  for (const key of Object.keys(state.selections ?? {})) state.selections[key] = checkedOverride(params, key, state.selections[key]);
+  for (const key of Object.keys(state.overrides)) state.overrides[key] = checkedOverride(params, key, state.overrides[key], fixedPerson.personTemplate);
+  for (const key of Object.keys(state.selections ?? {})) state.selections[key] = checkedOverride(params, key, state.selections[key], fixedPerson.personTemplate);
   const fieldSeed = (s, field) => hashKey(s.vSeed, "setupV", s.fieldGenerations[field], field);
   for (const field of fields) values[field] = null;
   // Resolve all upstream fields before dependent character fields, independent of UI layout.
   const order = ["name", "appearance", "personaStyle", "mainActivity", "species", "occupationV", "statusV", "firstPerson",
     ...fields.filter(field => !["name", "appearance", "personaStyle", "mainActivity", "species", "occupationV", "statusV", "firstPerson"].includes(field))];
   for (const field of order) values[field] = state.overrides[field] ?? state.selections?.[field] ??
-    automatic(params, field, fieldSeed(state, field), values, state.fieldGenerations[field] > 0);
+    automatic(params, field, fieldSeed(state, field), values, state.fieldGenerations[field] > 0, fixedPerson.personTemplate);
   function push(next, nextValues) {
     history = [...history.slice(-9), { state, values }]; state = next; values = nextValues;
   }
@@ -180,12 +208,21 @@ function editor(params, record, initialEntry) {
   }
   function locked(field) { return state.lockedGroups.some(group => LOCK_GROUPS[group].includes(field)); }
   function snapshot() {
+    const characterProfile = resolvedV(params, values);
+    const { format, liveMode } = characterProfile.mainActivity;
+    const { voiceTraining, distance } = characterProfile.continuationPolicy;
     const issues = [...fixedPerson.issues, ...fields.filter(field => values[field] === null)
       .map(field => ({ field, reason: "自動候補・生成データが未定義" }))];
     if (values.statusV?.preset === "ST09" && !values.statusV.formerTitle)
       issues.push({ field: "statusV", reason: "元の肩書きを設定してください" });
-    return freeze({ personTemplate: fixedPerson.personTemplate,
-      runSetupTemplate: { startDate: fixedPerson.personTemplate.startDate, v: clone(values), dream: null, autoMajorChoices: false },
+    return freeze({ seed: state.worldSeed, personTemplate: fixedPerson.personTemplate,
+      runSetupTemplate: { startDate: fixedPerson.personTemplate.startDate, v: clone(values), characterProfile,
+        generationVersion: params.collections.initialWeights.generation.version,
+        policy: { format, liveMode, voiceTraining, distance }, dream: null, autoMajorChoices: false,
+        naming: { version: params.collections.initialWeights.vDefaults.nameLedger.version,
+          releaseReady: params.collections.initialWeights.vDefaults.nameLedger.releaseReady && values.name.custom === null,
+          status: values.name.custom !== null ? "PLAYER_UNCHECKED" :
+            dataCandidates(params, "name").find(row => row.id === values.name.preset).status } },
       setupProvenance: { entry, personFixedAtStart: true, person: fixedPerson.provenance,
         v: vProvenance(params, clone(values), state.overrides),
         dream: { value: null, method: "unset", evidenceClass: "—", playerOverride: false },
@@ -205,7 +242,7 @@ function editor(params, record, initialEntry) {
     },
     override(field, value) {
       editable(field);
-      const checked = checkedOverride(params, field, value);
+      const checked = checkedOverride(params, field, value, fixedPerson.personTemplate);
       push({ ...state, overrides: { ...state.overrides, [field]: checked } }, { ...values, [field]: checked });
       return snapshot();
     },
@@ -219,7 +256,7 @@ function editor(params, record, initialEntry) {
       for (const key of selected) {
         next.fieldGenerations[key] = next.rerollCount;
         delete next.overrides[key];
-        nextValues[key] = automatic(params, key, fieldSeed(next, key), nextValues, true);
+        nextValues[key] = automatic(params, key, fieldSeed(next, key), nextValues, true, fixedPerson.personTemplate);
       }
       push(next, nextValues); return snapshot();
     },

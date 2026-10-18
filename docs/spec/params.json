@@ -6688,8 +6688,8 @@
     {
      "対象": "実年齢",
      "層": "人物（固定）",
-     "方法": "未決",
-     "重み・値": "18歳以上。分布は未決（値を置かない）",
+     "方法": "打ち切り離散正規分布",
+     "重み・値": "18～45歳、平均（ピーク）25、標準偏差6。整数年齢の密度を正規化（ゲーム設定・統計根拠なし）",
      "区分": "仮置き"
     },
     {
@@ -6703,7 +6703,7 @@
      "対象": "基本気質（CoreDisposition）",
      "層": "人物（固定）",
      "方法": "仕様書第30.2節の8軸を独立に生成",
-     "重み・値": "分布は未決",
+     "重み・値": "各軸0～1の連続一様、独立（ゲーム設定・統計根拠なし）",
      "区分": "仮置き"
     },
     {
@@ -6723,7 +6723,7 @@
     {
      "対象": "Vの名前",
      "層": "V",
-     "方法": "名称台帳の確認済み候補から一様",
+     "方法": "開発用の架空名台帳から一様（外部確認未実施・公開不可）",
      "重み・値": "各1.0",
      "区分": "ゲーム設定"
     },
@@ -6797,7 +6797,1150 @@
      "重み・値": "全EVで未設定（`weight.value: null`）。第20章の調整で決める。EV86～EV88を含め、設定で下げる・除外する仕組みは持たない",
      "区分": "仮置き"
     }
-   ]
+   ],
+   "generation": {
+    "version": "setup-generation-0.3.0",
+    "evidenceClass": "仮置き",
+    "basis": "P-18: 統計根拠のない開発用ゲーム設定。人物・能力・人口の実測分布ではない。",
+    "age": {
+     "distribution": "truncated_discrete_normal",
+     "min": 18,
+     "max": 45,
+     "mean": 25,
+     "standardDeviation": 6
+    },
+    "backgroundCategories": [
+     {
+      "key": "office",
+      "label": "営業・会社員",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG01",
+        "lifeProfile": "salary",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG02",
+        "lifeProfile": "salary",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG18",
+        "lifeProfile": "salary",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG28",
+        "lifeProfile": "salary",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "service",
+      "label": "店舗運営・接客",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG04",
+        "lifeProfile": "shift",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG19",
+        "lifeProfile": "shift",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "student",
+      "label": "学業・アルバイト・趣味",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG21",
+        "lifeProfile": "student",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "education",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "visual",
+      "label": "イラスト・漫画・素材制作",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG03",
+        "lifeProfile": "creative",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG14",
+        "lifeProfile": "creative",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG17",
+        "lifeProfile": "creative",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG30",
+        "lifeProfile": "creative",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "experience",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "commentary",
+      "label": "実況・動画投稿",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG05",
+        "lifeProfile": "salary",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "experience",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "music",
+      "label": "歌・音楽表現",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG16",
+        "lifeProfile": "creative",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "experience",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG24",
+        "lifeProfile": "creative",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "experience",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "education",
+      "label": "教育・専門分野",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG25",
+        "lifeProfile": "salary",
+        "minAge": 22,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "acting",
+      "label": "演技の学習",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG12",
+        "lifeProfile": "student",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "education",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "production",
+      "label": "制作・企画",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG15",
+        "lifeProfile": "creative",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "technical",
+      "label": "技術・交代勤務・事業",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG20",
+        "lifeProfile": "shift",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG23",
+        "lifeProfile": "salary",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG26",
+        "lifeProfile": "shift",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG27",
+        "lifeProfile": "shift",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       },
+       {
+        "backgroundId": "BG29",
+        "lifeProfile": "salary",
+        "minAge": 22,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "childcare",
+      "label": "子育て中心",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG22",
+        "lifeProfile": "care",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "homemaker",
+      "label": "専業主婦・主夫",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG31",
+        "lifeProfile": "homemaker",
+        "minAge": 20,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "composer",
+      "label": "作詞・作曲",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG32",
+        "lifeProfile": "creative",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     },
+     {
+      "key": "writer",
+      "label": "執筆",
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      },
+      "candidates": [
+       {
+        "backgroundId": "BG33",
+        "lifeProfile": "creative",
+        "minAge": 18,
+        "maxAge": 45,
+        "minYear": 2016,
+        "maxYear": 2026,
+        "kind": "employment",
+        "weight": {
+         "value": 1,
+         "evidenceClass": "仮置き"
+        }
+       }
+      ]
+     }
+    ],
+    "coreDisposition": {
+     "distribution": "uniform",
+     "min": 0,
+     "max": 1,
+     "axes": [
+      "sociability",
+      "caution",
+      "planning",
+      "expressiveness",
+      "competitiveness",
+      "curiosity",
+      "careOrientation",
+      "feedbackSensitivity"
+     ]
+    },
+    "naturalSpeech": {
+     "firstPerson": [
+      {
+       "value": "わたし",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "僕",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "うち",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "自分",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "acknowledgement": [
+      {
+       "value": "うん",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "なるほど",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "そうだね",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "そっか",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ]
+    },
+    "life": {
+     "profiles": {
+      "salary": {
+       "monthlyIncomeYen": {
+        "min": 180000,
+        "max": 280000
+       },
+       "workHoursPerWeek": {
+        "min": 35,
+        "max": 45
+       }
+      },
+      "shift": {
+       "monthlyIncomeYen": {
+        "min": 150000,
+        "max": 240000
+       },
+       "workHoursPerWeek": {
+        "min": 30,
+        "max": 45
+       }
+      },
+      "student": {
+       "monthlyIncomeYen": {
+        "min": 30000,
+        "max": 80000
+       },
+       "workHoursPerWeek": {
+        "min": 25,
+        "max": 35
+       }
+      },
+      "creative": {
+       "monthlyIncomeYen": {
+        "min": 50000,
+        "max": 200000
+       },
+       "workHoursPerWeek": {
+        "min": 20,
+        "max": 40
+       }
+      },
+      "care": {
+       "monthlyIncomeYen": {
+        "min": 0,
+        "max": 60000
+       },
+       "workHoursPerWeek": {
+        "min": 0,
+        "max": 10
+       }
+      },
+      "homemaker": {
+       "monthlyIncomeYen": {
+        "min": 0,
+        "max": 0
+       },
+       "workHoursPerWeek": {
+        "min": 0,
+        "max": 0
+       }
+      }
+     },
+     "livingCostYen": {
+      "min": 60000,
+      "max": 120000
+     },
+     "openingBalanceYen": {
+      "min": 100000,
+      "max": 800000
+     },
+     "regions": [
+      {
+       "value": "regional_family_home",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "regional_city",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "metropolitan_area",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "motivations": [
+      {
+       "value": "hobby",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "expression",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "value": "professional_interest",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ]
+    },
+    "experience": {
+     "earliestAge": 12,
+     "years": {
+      "min": 0,
+      "max": 6
+     },
+     "hoursPerYear": {
+      "min": 20,
+      "max": 100
+     },
+     "aptitude": {
+      "min": 0,
+      "max": 1
+     },
+     "abilityBase": 5,
+     "aptitudeScale": 20,
+     "gainPerHour": 0.08
+    },
+    "affiliations": [
+     {
+      "value": "independent",
+      "minYear": 2016,
+      "minPracticeYears": 0,
+      "weight": {
+       "value": 8,
+       "evidenceClass": "仮置き"
+      }
+     },
+     {
+      "value": "small_agency",
+      "minYear": 2017,
+      "minPracticeYears": 1,
+      "weight": {
+       "value": 2,
+       "evidenceClass": "仮置き"
+      }
+     },
+     {
+      "value": "large_agency",
+      "minYear": 2018,
+      "minPracticeYears": 3,
+      "weight": {
+       "value": 1,
+       "evidenceClass": "仮置き"
+      }
+     }
+    ],
+    "bg22": {
+     "unionProbability": 0.85,
+     "childrenRequired": true,
+     "nonUnion": "single_parent",
+     "minimumAge": 20
+    }
+   },
+   "vDefaults": {
+    "evidenceClass": "仮置き",
+    "basis": "P-18: 架空の開発用候補。名称の外部確認は未実施。候補IDは固定し並べ替えない。",
+    "nameLedger": {
+     "version": "names-draft-0.1.0",
+     "releaseReady": false,
+     "review": {
+      "status": "DRAFT",
+      "checkedAt": null,
+      "reviewer": null,
+      "queries": [],
+      "urls": [],
+      "unchecked": [
+       "一般検索",
+       "動画・SNS",
+       "読み・類似名称",
+       "商標",
+       "内容の組合せ"
+      ]
+     },
+     "candidates": [
+      {
+       "id": "CS90_00",
+       "value": "綴灯 こよりね",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       },
+       "reading": "つづりび こよりね",
+       "status": "DRAFT"
+      },
+      {
+       "id": "CS90_01",
+       "value": "雲栞 ねむり葉",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       },
+       "reading": "くもしおり ねむりは",
+       "status": "DRAFT"
+      },
+      {
+       "id": "CS90_02",
+       "value": "砂音 ほしつづり",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       },
+       "reading": "すなおと ほしつづり",
+       "status": "DRAFT"
+      }
+     ]
+    },
+    "customLimits": {
+     "name": 24
+    },
+    "appearanceParts": {
+     "hair": [
+      "short",
+      "bob",
+      "long"
+     ],
+     "outfit": [
+      "jacket",
+      "robe",
+      "overalls"
+     ],
+     "color": [
+      "#587B9C",
+      "#98759C",
+      "#71957B"
+     ]
+    },
+    "candidates": {
+     "appearance": [
+      {
+       "id": "CS91_00",
+       "value": {
+        "hair": "short",
+        "outfit": "jacket",
+        "color": "#587B9C",
+        "model": "illustration"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS91_01",
+       "value": {
+        "hair": "bob",
+        "outfit": "robe",
+        "color": "#98759C",
+        "model": "2d"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS91_02",
+       "value": {
+        "hair": "long",
+        "outfit": "overalls",
+        "color": "#71957B",
+        "model": "3d",
+        "productionSupport": "self_made"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "mainActivity": [
+      {
+       "id": "CS92_00",
+       "value": {
+        "format": "video",
+        "liveMode": "off"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       },
+       "minYear": 2016,
+       "maxYear": 2026,
+       "backgroundIds": [
+        "BG05",
+        "BG15",
+        "BG30"
+       ],
+       "affinityMultiplier": 2
+      },
+      {
+       "id": "CS92_01",
+       "value": {
+        "format": "shorts",
+        "liveMode": "off"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       },
+       "minYear": 2021,
+       "maxYear": 2026,
+       "backgroundIds": [],
+       "affinityMultiplier": 1
+      },
+      {
+       "id": "CS92_02",
+       "value": {
+        "format": "music",
+        "liveMode": "off"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       },
+       "minYear": 2016,
+       "maxYear": 2026,
+       "backgroundIds": [
+        "BG16",
+        "BG24",
+        "BG32"
+       ],
+       "affinityMultiplier": 2
+      },
+      {
+       "id": "CS92_03",
+       "value": {
+        "format": "stream",
+        "liveMode": "regular"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       },
+       "minYear": 2016,
+       "maxYear": 2026,
+       "backgroundIds": [],
+       "affinityMultiplier": 1
+      }
+     ],
+     "continuationPolicy": [
+      {
+       "id": "CS93_00",
+       "value": {
+        "voiceTraining": false,
+        "distance": "hobby"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS93_01",
+       "value": {
+        "voiceTraining": false,
+        "distance": "balanced"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS93_02",
+       "value": {
+        "voiceTraining": true,
+        "distance": "balanced"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "fanName": [
+      {
+       "id": "CS03_01",
+       "value": "なし",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "greeting": [
+      {
+       "id": "CS06_00",
+       "value": {
+        "opening": "こんにちは。今日もよろしくね。",
+        "closing": "今日もありがとう。またね。"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS06_01",
+       "value": {
+        "opening": "ようこそ。ゆっくりしていってね。",
+        "closing": "それでは、また次の時間に。"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "profile": [
+      {
+       "id": "CS07_00",
+       "value": {
+        "birthday": "04-12",
+        "age": "ひみつ",
+        "heightCm": 160
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS07_01",
+       "value": {
+        "birthday": "09-23",
+        "age": "千年以上",
+        "heightCm": 170
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "motif": [
+      {
+       "id": "CS08_00",
+       "value": {
+        "motif": "雲",
+        "color": "#587B9C"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS08_01",
+       "value": {
+        "motif": "しおり",
+        "color": "#98759C"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS08_02",
+       "value": {
+        "motif": "葉",
+        "color": "#71957B"
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "tags": [
+      {
+       "id": "CS09_00",
+       "value": {
+        "activity": null,
+        "fanArt": null
+       },
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "mark": [
+      {
+       "id": "CS10_00",
+       "value": "なし",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "speech": [
+      {
+       "id": "CS11_00",
+       "value": "穏やか",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS11_01",
+       "value": "丁寧",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS11_02",
+       "value": "くだけた",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "world": [
+      {
+       "id": "CS12_00",
+       "value": "日々の小さな発見を集めている。",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS12_01",
+       "value": "まだ見ぬ景色の話を届けたい。",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ],
+     "family": [
+      {
+       "id": "CS13_00",
+       "value": "設定なし",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      },
+      {
+       "id": "CS13_01",
+       "value": "遠い町から旅をしてきた。",
+       "weight": {
+        "value": 1,
+        "evidenceClass": "仮置き"
+       }
+      }
+     ]
+    }
+   }
   },
   "backgroundLifeEffects": [
    {
@@ -6903,7 +8046,7 @@
     },
     {
      "項目": "BG22 子育て・家事が中心の生活",
-     "値": "子供ありを必須にし、既婚の確率0.85。BG31と同時に付けない",
+     "値": "子供ありを必須にし、既婚・同居の確率0.85、残りはひとり親（P-18a）。BG31と同時に付けない",
      "区分": "仮置き"
     },
     {

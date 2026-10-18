@@ -1,6 +1,6 @@
 import { createRng } from "./rng.js";
 import { addDays, daysBetween } from "./calendar.js";
-import { getCandidates } from "./params.js";
+import { ABILITY_AXES, getCandidates } from "./params.js";
 
 export function freeze(value) {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -33,29 +33,101 @@ export function generateStartDate(params, personSeed) {
   return addDays(first, rng.fork("startDate").int(0, daysBetween(first, `${year + 1}-01-01`) - 1));
 }
 
-// A draft is deliberately not a playable person. P-18 explicitly leaves these
-// distributions undecided; neither a midpoint nor a uniform fallback is valid.
+// Integer ages are sampled from the normal density at each integer, conditioned
+// on the configured bounds. These are game weights, not population statistics.
+export function ageWeights(params) {
+  const a = params.collections.initialWeights.generation.age;
+  if (a.distribution !== "truncated_discrete_normal" || !Number.isSafeInteger(a.min) ||
+      !Number.isSafeInteger(a.max) || a.min < 18 || a.max < a.min || a.max - a.min > 200 ||
+      !Number.isFinite(a.mean) || a.mean < a.min || a.mean > a.max ||
+      !Number.isFinite(a.standardDeviation) || a.standardDeviation <= 0)
+    throw new TypeError("Invalid age distribution");
+  return Array.from({ length: a.max - a.min + 1 }, (_, i) => ({
+    age: a.min + i, weight: Math.exp(-0.5 * ((a.min + i - a.mean) / a.standardDeviation) ** 2),
+  }));
+}
+
+function integer(rng, range) {
+  if (!range || !Number.isSafeInteger(range.min) || !Number.isSafeInteger(range.max) ||
+      range.min < 0 || range.max < range.min) throw new TypeError("Invalid initial range");
+  return rng.int(range.min, range.max);
+}
+function uniform(rng, range) {
+  if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max) ||
+      range.min < 0 || range.max < range.min) throw new TypeError("Invalid initial range");
+  return range.min + rng.next() * (range.max - range.min);
+}
+const pick = (rng, rows) => rng.weighted(rows, rows.map(row => row.weight.value));
+const generated = (value, source, method) => ({
+  value, method, evidenceClass: source.evidenceClass, basis: source.basis, playerOverride: false,
+});
+
 export function generatePerson(params, personSeed) {
-  const startDate = generateStartDate(params, personSeed);
-  const personTemplate = freeze({ personSeed, startDate, startYear: Number(startDate.slice(0, 4)),
-    age: null, background: null, life: null, household: null, coreDisposition: null, naturalSpeech: null });
-  const rules = { age: "実年齢", background: "中の人の職業・経歴（BG）",
-    household: "婚姻状態・パートナー・子供", coreDisposition: "基本気質（CoreDisposition）",
-    naturalSpeech: "普段の言い回し（NaturalSpeech）" };
-  const fields = {
-    startYear: provenance(personTemplate.startYear, initialRule(params, "開始年"), "uniform"),
-    startDate: provenance(startDate, initialRule(params, "開始月・日"), "uniform"),
-    life: { value: null, method: "unresolved", evidenceClass: "仮置き", basis: "生活条件の生成値なし", playerOverride: false },
+  const source = params.collections.initialWeights.generation;
+  if (!source || source.evidenceClass !== "仮置き") throw new TypeError("Missing P-18 generation data");
+  const rng = createRng(personSeed, "person"), startDate = generateStartDate(params, personSeed);
+  const startYear = Number(startDate.slice(0, 4)), ages = ageWeights(params);
+  const age = rng.fork("age").weighted(ages, ages.map(row => row.weight)).age;
+  const active = new Set(getCandidates(params, "backgrounds").map(row => row.id));
+  const categories = source.backgroundCategories.map(category => ({ ...category,
+    candidates: category.candidates.filter(row => active.has(row.backgroundId) &&
+      age >= row.minAge && age <= row.maxAge && startYear >= row.minYear && startYear <= row.maxYear),
+  })).filter(category => category.candidates.length);
+  const category = pick(rng.fork("backgroundCategory"), categories);
+  const backgroundRule = pick(rng.fork("background"), category.candidates);
+  const background = backgroundRule.backgroundId, lifeRule = source.life;
+  const profile = lifeRule.profiles[backgroundRule.lifeProfile];
+  if (!profile) throw new TypeError("Missing background life profile");
+  const life = {
+    monthlyIncomeYen: integer(rng.fork("income"), profile.monthlyIncomeYen),
+    livingCostYen: integer(rng.fork("livingCost"), lifeRule.livingCostYen),
+    openingBalanceYen: integer(rng.fork("balance"), lifeRule.openingBalanceYen),
+    workHoursPerWeek: integer(rng.fork("work"), profile.workHoursPerWeek),
+    region: pick(rng.fork("region"), lifeRule.regions).value,
   };
-  for (const [field, target] of Object.entries(rules)) fields[field] = provenance(null, initialRule(params, target), "unresolved");
-  return freeze({ personTemplate, provenance: fields, issues: [
-    { field: "age", reason: "P-18: 実年齢の上限・分布が未決" },
-    { field: "background", reason: "P-18: カテゴリとBGの対応・年齢と年代の成立条件が未定義" },
-    { field: "life", reason: "生活条件・居住区分・経験・初期所属の生成値が未定義" },
-    { field: "household", reason: "P-20: 実年齢・BGの確定が必要" },
-    { field: "coreDisposition", reason: "P-18: 8軸の分布が未決" },
-    { field: "naturalSpeech", reason: "P-18: 普段の一人称・相づちの候補が未定義" },
-  ] });
+  const family = generateHousehold(params, { personSeed, age, background });
+  life.careHoursPerWeek = family.household.childcareHoursPerWeek;
+  const core = source.coreDisposition;
+  if (core.distribution !== "uniform" || core.axes.length !== 8 || new Set(core.axes).size !== 8 ||
+      core.min !== 0 || core.max !== 1) throw new TypeError("Invalid disposition axes");
+  const coreDisposition = Object.fromEntries(core.axes.map(axis => [axis, uniform(rng.fork("core", axis), core)]));
+  const naturalSpeech = Object.fromEntries(Object.entries(source.naturalSpeech).map(([field, rows]) =>
+    [field, pick(rng.fork("speech", field), rows).value]));
+  if (!naturalSpeech.firstPerson || !naturalSpeech.acknowledgement) throw new TypeError("Missing NaturalSpeech");
+  const e = source.experience, abilities = {}, aptitudes = {};
+  // Practice and aptitude are sampled separately from BG, household and V.
+  // A job or qualification never supplies a blanket ability bonus.
+  const experience = ABILITY_AXES.map(axis => {
+    const years = integer(rng.fork("practiceYears", axis), {
+      min: e.years.min, max: Math.min(e.years.max, age - e.earliestAge),
+    });
+    const hours = years * integer(rng.fork("practiceHours", axis), e.hoursPerYear);
+    aptitudes[axis] = uniform(rng.fork("aptitude", axis), e.aptitude);
+    abilities[axis] = Math.min(params.collections.simBalance.ability.max,
+      Math.max(params.collections.simBalance.ability.min, e.abilityBase + aptitudes[axis] * e.aptitudeScale + hours * e.gainPerHour));
+    return { kind: "practice", axis, startAge: age - years, endAge: age, hours };
+  });
+  const practiceYears = Math.max(...experience.map(row => row.endAge - row.startAge));
+  const initialAffiliation = pick(rng.fork("affiliation"), source.affiliations.filter(row =>
+    startYear >= row.minYear && practiceYears >= row.minPracticeYears)).value;
+  const currentWork = { background, kind: backgroundRule.kind, lifeProfile: backgroundRule.lifeProfile };
+  const employment = backgroundRule.kind === "employment" ? [{ background, startAge: age, endAge: null }] : [];
+  const personTemplate = freeze({ personSeed, generationVersion: source.version, startDate, startYear,
+    age, background, backgroundCategory: category.key, currentWork, employment, experience, qualifications: [],
+    aptitudes, abilities, life, household: family.household, coreDisposition, naturalSpeech, initialAffiliation,
+    motivation: pick(rng.fork("motivation"), lifeRule.motivations).value });
+  const fields = {
+    startYear: provenance(startYear, initialRule(params, "開始年"), "uniform"),
+    startDate: provenance(startDate, initialRule(params, "開始月・日"), "uniform"),
+    age: generated(age, source, "truncated_discrete_normal"),
+    background: generated(background, source, "category_then_eligible_weighted"),
+    household: family.provenance,
+  };
+  for (const key of ["backgroundCategory", "currentWork", "employment", "experience", "qualifications",
+    "aptitudes", "abilities", "life", "coreDisposition", "naturalSpeech", "initialAffiliation", "motivation"])
+    fields[key] = generated(personTemplate[key], source,
+      ["abilities", "employment", "currentWork", "qualifications"].includes(key) ? "derived" : "random");
+  return freeze({ personTemplate, provenance: fields, issues: [] });
 }
 
 const parsedHouseholds = new WeakMap();
@@ -109,22 +181,25 @@ function householdRules(params) {
 export function generateHousehold(params, { personSeed, age, background }) {
   if (!Number.isSafeInteger(age) || age < 18 || !getCandidates(params, "backgrounds").some(row => row.id === background))
     throw new TypeError("Household requires an adult and an active BG");
-  // P-20 mandates children for BG22 but permits a non-cohabiting branch, whereas
-  // spec 37.3 permits children only in a union. Do not silently pick a precedence.
-  if (background === "BG22") throw new TypeError("Unresolved BG22 household consistency (P-20 / 37.3)");
+  const bg22 = params.collections.initialWeights.generation.bg22;
+  if (bg22.childrenRequired !== true || bg22.nonUnion !== "single_parent" ||
+      !Number.isSafeInteger(bg22.minimumAge) || bg22.minimumAge < 20)
+    throw new TypeError("Invalid BG22 household rule");
+  if (background === "BG22" && age < bg22.minimumAge) throw new TypeError("BG22 requires a feasible child age");
   const r = householdRules(params), rng = createRng(personSeed, "person", "household");
   const band = r.married.find(row => age >= row.min && age <= row.max);
   const childBand = r.children.find(row => age >= row.min && age <= row.max);
   if (!band || !childBand) throw new TypeError("Missing household age band");
-  const chance = background === "BG31" ? r.bg31 : band.value * r.starter * (background === "BG21" ? r.bg21 : r.other);
+  const chance = background === "BG22" ? bg22.unionProbability : background === "BG31" ? r.bg31 : band.value * r.starter * (background === "BG21" ? r.bg21 : r.other);
   if (!Number.isFinite(chance) || chance < 0 || chance > 1) throw new TypeError("Invalid union probability");
   const inUnion = rng.fork("union").next() < chance;
   const maritalStatus = inUnion ? rng.fork("status").weighted(["married", "partnered"], r.union)
-    : rng.fork("dating").next() < r.dating ? "dating" : "single";
+    : background !== "BG22" && rng.fork("dating").next() < r.dating ? "dating" : "single";
   const hasPartner = maritalStatus !== "single";
   const partnerShare = inUnion ? r.share[0] + rng.fork("share").next() * (r.share[1] - r.share[0]) : 0;
   const maxAge = Math.min(age - r.childAge[1], r.childAge[2]);
-  const hasChildren = inUnion && maxAge >= r.childAge[0] && rng.fork("children").next() < childBand.value;
+  const hasChildren = maxAge >= r.childAge[0] && (background === "BG22" ||
+    (inUnion && rng.fork("children").next() < childBand.value));
   const childCount = hasChildren ? rng.fork("count").weighted([1, 2, 3], r.counts) : 0;
   const children = Array.from({ length: childCount }, (_, i) => ({
     id: `child-${i + 1}`, relativeAge: rng.fork("child", i).int(r.childAge[0], maxAge),
@@ -140,5 +215,5 @@ export function generateHousehold(params, { personSeed, age, background }) {
   birthRole: "not_applicable", disclosure: "private" };
   return freeze({ household, provenance: { value: household, method: "stat_informed_weighted",
     evidenceClass: "推定／仮置き", referenceStatsIds: [...new Set([...r.sourceIds, "M32"])],
-    basis: "P-20", playerOverride: false } });
+    basis: background === "BG22" ? "P-18 BG22 / P-20: 非同居はひとり親" : "P-20", playerOverride: false } });
 }

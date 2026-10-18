@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { loadParams } from "../src/params.js";
-import { generateStartDate, generatePerson, generateHousehold } from "../src/person.js";
+import { ageWeights, generateStartDate, generatePerson, generateHousehold } from "../src/person.js";
 import { createSetup, importSeedCode, compatibilityWeight, LOCK_GROUPS } from "../src/setup.js";
+import { createSimulation, advanceToBoundary, runToEnd } from "../src/sim.js";
+import { createRng } from "../src/rng.js";
 import { encodeSeedCode, decodeSeedCode, SEED_VERSIONS, SEED_FIELDS } from "../src/seedcode.js";
 
 const params = await loadParams(url => readFile(url, "utf8"));
@@ -30,23 +32,38 @@ test("AT01/AT101 partial: all start years and leap day are reachable with unifor
   assert.throws(() => generateStartDate(invalid, 12));
 });
 
-test("AT02/AT91 pending data: unresolved distributions cannot masquerade as a playable person", () => {
-  const session = createSetup(params, { seed: 123 });
-  const snapshot = session.snapshot();
-  assert.equal(snapshot.ready, false);
-  assert.ok(snapshot.issues.some(row => row.field === "age"));
-  assert.ok(snapshot.issues.some(row => row.field === "coreDisposition"));
-  assert.ok(snapshot.issues.some(row => row.field === "name"));
-  assert.equal(snapshot.personTemplate.age, null);
-  assert.equal(snapshot.personTemplate.naturalSpeech, null);
-  assert.throws(() => session.exportSeedCode(), /unfinished/);
-  assert.throws(() => session.reroll(), /QS2/);
-  assert.throws(() => session.setLock("v_settings", true), /QS2/);
-  assert.equal(snapshot.runSetupTemplate.dream, null);
-  assert.equal(snapshot.runSetupTemplate.autoMajorChoices, false);
+test("AT01/AT02/AT91 setup: QS1 is ready and accepted by simulation in every start year", () => {
+  const years = new Set();
+  for (let seed = 0; seed < 500; seed++) {
+    const session = createSetup(params, { seed }), snapshot = session.snapshot();
+    assert.equal(snapshot.ready, true);
+    assert.deepEqual(snapshot.issues, []);
+    assert.ok(snapshot.personTemplate.naturalSpeech.firstPerson);
+    assert.equal(Object.keys(snapshot.personTemplate.abilities).length, 8);
+    assert.equal(snapshot.personTemplate.life.careHoursPerWeek, snapshot.personTemplate.household.childcareHoursPerWeek);
+    assert.equal(snapshot.runSetupTemplate.dream, null);
+    assert.equal(snapshot.runSetupTemplate.autoMajorChoices, false);
+    assert.throws(() => session.reroll(), /QS2/);
+    assert.throws(() => session.setLock("v_settings", true), /QS2/);
+    if (years.has(snapshot.personTemplate.startYear)) continue;
+    years.add(snapshot.personTemplate.startYear);
+    const run = createSimulation(params, snapshot);
+    assert.equal(run.state, "RUNNING");
+    assert.ok(advanceToBoundary(params, run).calendar.currentDate > run.calendar.currentDate);
+  }
+  assert.deepEqual([...years].sort(), Array.from({ length: 11 }, (_, i) => 2016 + i));
 });
 
-test("AT93/AT94 partial: QS entries share templates, provenance records resolved and unresolved values", () => {
+test("AT02/AT03 setup integration: identical QS1 seeds run to the observation limit without input", () => {
+  const run = () => runToEnd(params, createSimulation(params, { seed: "m10-end",
+    ...createSetup(params, { seed: "m10-end" }).snapshot() }));
+  const a = run(), b = run();
+  assert.deepEqual(a, b);
+  assert.equal(a.state, "RESULT");
+  assert.equal(a.lifeSnapshot.reason, "observation-limit");
+});
+
+test("AT93/AT94 partial: QS entries share templates and resolved provenance", () => {
   const overrides = { species: { preset: "SP11", custom: null }, occupationV: { preset: "JB11", custom: null } };
   const snapshots = ["QS1", "QS2", "QS3"].map(entry => createSetup(params, { seed: "same", entry, overrides }).snapshot());
   for (const s of snapshots) {
@@ -113,7 +130,7 @@ test("AT131 partial: automatic SP/JB/ST pairs avoid forbidden combinations, play
   const gap = session.override("occupationV", { preset: "JB11", custom: null });
   assert.equal(gap.runSetupTemplate.v.occupationV.preset, "JB11");
   assert.equal(gap.issues.some(row => row.field === "occupationV"), false);
-  assert.equal(session.snapshot().personTemplate.background, null);
+  assert.match(session.snapshot().personTemplate.background, /^BG\d{2}$/);
   for (let i = 0; i < 30; i++) assert.notEqual(session.reroll("occupationV").runSetupTemplate.v.occupationV.preset, "JB11");
 });
 
@@ -187,10 +204,9 @@ test("AT98/AT99 codec: seed metadata, locks, generations and candidate selection
   const extra = seedRecord(); extra.deviceId = "private";
   assert.throws(() => encodeSeedCode(extra));
   assert.equal(importSeedCode(params, "invalid").ok, false);
-  const incomplete = importSeedCode(params, code);
-  assert.equal(incomplete.ok, false);
-  assert.equal(Object.hasOwn(incomplete, "session"), false);
-  assert.equal(incomplete.error, "初期値データが未確定です");
+  const restored = importSeedCode(params, code);
+  assert.equal(restored.ok, true);
+  assert.equal(restored.session.snapshot().ready, true);
 });
 
 test("AT98 codec: custom text never appears in decoded payload and carries an omission notice", () => {
@@ -280,8 +296,147 @@ test("AT136/AT146/AT147 household component: deterministic, immutable, no abilit
   assert.equal(result.provenance.playerOverride, false);
   assert.ok(result.household.childcareHoursPerWeek > 0);
   assert.equal(Object.hasOwn(result.household, "abilities"), false);
-  for (const background of ["BG06", "BG07", "BG08", "BG09", "BG10", "BG11", "BG13", "BG22"])
+  for (const background of ["BG06", "BG07", "BG08", "BG09", "BG10", "BG11", "BG13"])
     assert.throws(() => generateHousehold(params, { ...input, background }));
   for (const age of [17, 18.5, NaN]) assert.throws(() => generateHousehold(params, { ...input, age }));
   assert.deepEqual(generatePerson(params, 123), generatePerson(params, 123));
+});
+
+test("P-18 age: truncated normal peaks at 25 and uses configured standard deviation", () => {
+  const rows = ageWeights(params), age = params.collections.initialWeights.generation.age;
+  assert.deepEqual([age.min, age.max, age.mean, age.standardDeviation], [18, 45, 25, 6]);
+  assert.equal(rows.length, 28);
+  assert.equal(rows.reduce((a, b) => a.weight > b.weight ? a : b).age, 25);
+  assert.equal(rows.find(row => row.age === 19).weight, rows.find(row => row.age === 31).weight);
+  assert.equal(rows.find(row => row.age === 31).weight, Math.exp(-0.5));
+  const total = rows.reduce((sum, row) => sum + row.weight, 0), counts = new Map(rows.map(row => [row.age, 0]));
+  for (let seed = 0; seed < 20000; seed++) {
+    const selected = createRng(seed, "person").fork("age").weighted(rows, rows.map(row => row.weight)).age;
+    counts.set(selected, counts.get(selected) + 1);
+    if (seed < 200) assert.equal(generatePerson(params, seed).personTemplate.age, selected);
+  }
+  for (const row of rows) assert.ok(Math.abs(counts.get(row.age) / 20000 - row.weight / total) < 0.008);
+  const altered = copy(params);
+  altered.collections.initialWeights.generation.age.standardDeviation = 3;
+  assert.ok(ageWeights(altered).find(row => row.age === 31).weight < rows.find(row => row.age === 31).weight);
+  altered.collections.initialWeights.generation.age.mean = 30;
+  assert.equal(ageWeights(altered).find(row => row.age === 30).weight, 1);
+  for (const standardDeviation of [0, -1, NaN]) {
+    altered.collections.initialWeights.generation.age.standardDeviation = standardDeviation;
+    assert.throws(() => generatePerson(altered, 1), /age distribution/);
+  }
+});
+
+test("P-18 background eligibility and initial values are data-driven without retired IDs or blanket bonuses", () => {
+  const g = params.collections.initialWeights.generation;
+  const mapped = g.backgroundCategories.flatMap(category => category.candidates.map(row => row.backgroundId));
+  const active = params.collections.backgrounds.filter(row => !row.status?.startsWith("削除")).map(row => row.id);
+  assert.deepEqual([...mapped].sort(), [...active].sort());
+  const seen = new Set();
+  for (let seed = 0; seed < 1000; seed++) {
+    const { personTemplate: p, provenance } = generatePerson(params, seed);
+    seen.add(p.background);
+    const category = g.backgroundCategories.find(row => row.key === p.backgroundCategory);
+    const rule = category.candidates.find(row => row.backgroundId === p.background);
+    assert.ok(p.age >= rule.minAge && p.age <= rule.maxAge);
+    assert.ok(p.startYear >= rule.minYear && p.startYear <= rule.maxYear);
+    assert.equal(p.coreDisposition && Object.keys(p.coreDisposition).length, 8);
+    for (const value of Object.values(p.coreDisposition)) assert.ok(value >= 0 && value <= 1);
+    for (const value of Object.values(p.abilities)) assert.ok(value >= 0 && value <= 100);
+    for (const e of p.experience) assert.ok(e.startAge >= g.experience.earliestAge && e.endAge === p.age);
+    assert.deepEqual(p.qualifications, []);
+    assert.equal(provenance.age.evidenceClass, "仮置き");
+    assert.equal(provenance.abilities.method, "derived");
+    if (p.background === "BG31") {
+      assert.equal(p.life.monthlyIncomeYen, 0);
+      assert.equal(p.life.workHoursPerWeek, 0);
+    }
+  }
+  assert.deepEqual([...seen].sort(), active.sort());
+  const altered = copy(params);
+  altered.collections.initialWeights.generation.backgroundCategories = [{
+    ...g.backgroundCategories[0], candidates: [{ ...g.backgroundCategories[0].candidates[2],
+      backgroundId: "BG31", lifeProfile: "homemaker" }],
+  }];
+  const original = generatePerson(params, 42).personTemplate, changed = generatePerson(altered, 42).personTemplate;
+  assert.deepEqual(changed.abilities, original.abilities);
+  assert.deepEqual(changed.coreDisposition, original.coreDisposition);
+  assert.deepEqual(changed.naturalSpeech, original.naturalSpeech);
+});
+
+test("AT136/AT138/AT139 BG22 always has children, including its single-parent branch", () => {
+  let unions = 0, singleParents = 0;
+  for (let seed = 0; seed < 10000; seed++) {
+    const age = 20 + seed % 26, h = generateHousehold(params, { personSeed: seed, age, background: "BG22" }).household;
+    assert.ok(h.children.length >= 1 && h.children.length <= 3);
+    assert.ok(h.childcareHoursPerWeek > 0);
+    for (const child of h.children) assert.ok(child.relativeAge >= 0 && child.relativeAge <= Math.min(age - 20, 17));
+    if (["married", "partnered"].includes(h.maritalStatus)) unions++;
+    else {
+      singleParents++;
+      assert.equal(h.maritalStatus, "single");
+      assert.equal(h.partner, null);
+      assert.equal(h.partnerShare, 0);
+    }
+  }
+  assert.ok(Math.abs(unions / 10000 - 0.85) < 0.02);
+  assert.ok(singleParents > 0);
+  assert.throws(() => generateHousehold(params, { personSeed: 1, age: 19, background: "BG22" }));
+  const altered = copy(params);
+  altered.collections.initialWeights.generation.bg22.unionProbability = 0;
+  const h = generateHousehold(altered, { personSeed: 1, age: 20, background: "BG22" }).household;
+  assert.equal(h.maritalStatus, "single");
+  assert.ok(h.children.every(child => child.relativeAge === 0));
+});
+
+test("AT98/AT99 editor: every preset, locks, rerolls and next reroll survive seed-code import", () => {
+  for (const seed of [1, 35, 123, "editor-round-trip"]) {
+    const session = createSetup(params, { seed, entry: "QS3" });
+    const person = session.snapshot().personTemplate;
+    session.reroll();
+    session.setLock("v_appearance", true);
+    session.reroll("mainActivity");
+    session.override("world", { preset: "CS12_01", custom: null });
+    const before = session.snapshot(), code = session.exportSeedCode();
+    const restored = importSeedCode(params, code);
+    assert.equal(restored.ok, true);
+    const after = restored.session.snapshot();
+    assert.deepEqual(after, before);
+    assert.equal(restored.session.exportSeedCode(), code);
+    assert.equal(restored.session.undoCount, 0);
+    assert.deepEqual(restored.session.reroll(), session.reroll());
+    assert.strictEqual(session.snapshot().personTemplate, person);
+  }
+});
+
+test("AT98/AT100 editor: custom names are omitted, withdrawn ledger names cannot be imported", () => {
+  const session = createSetup(params, { seed: "name-ledger", entry: "QS3" });
+  const before = session.snapshot(), code = session.exportSeedCode();
+  assert.equal(before.runSetupTemplate.naming.releaseReady, false);
+  assert.equal(before.runSetupTemplate.naming.status, "DRAFT");
+  const altered = copy(params);
+  altered.collections.initialWeights.vDefaults.nameLedger.candidates.find(row =>
+    row.id === before.runSetupTemplate.v.name.preset).status = "REJECTED_COLLISION";
+  assert.equal(importSeedCode(altered, code).ok, false);
+  session.override("name", { custom: "自由に付けた名前" });
+  const imported = importSeedCode(params, session.exportSeedCode());
+  assert.equal(imported.ok, true);
+  assert.deepEqual(imported.notices, ["自由入力の項目は共有されません"]);
+  assert.equal(imported.session.snapshot().runSetupTemplate.v.name.custom, null);
+  assert.deepEqual(imported.session.snapshot().personTemplate, before.personTemplate);
+  assert.throws(() => session.override("name", { custom: "あ".repeat(25) }));
+});
+
+test("P-18 activity presets respect era on generation, edit, reroll and import", () => {
+  let early;
+  for (let seed = 0; seed < 100; seed++) {
+    const session = createSetup(params, { seed, entry: "QS3" });
+    if (session.snapshot().personTemplate.startYear < 2021) { early = session; break; }
+  }
+  assert.ok(early);
+  for (let i = 0; i < 30; i++) assert.notEqual(early.reroll("mainActivity").runSetupTemplate.policy.format, "shorts");
+  assert.throws(() => early.override("mainActivity", { preset: "CS92_01", custom: null }));
+  const decoded = decodeSeedCode(early.exportSeedCode()).record;
+  decoded.selections.mainActivity = { preset: "CS92_01", custom: null };
+  assert.equal(importSeedCode(params, encodeSeedCode(decoded)).ok, false);
 });
