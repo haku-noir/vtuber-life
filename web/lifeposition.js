@@ -49,7 +49,7 @@ export function renderLifePosition(view, methods = false) {
       <p>割合 p の逆数を約N人に1人とし、Nが10以上は有効数字2桁、10未満は整数に丸めます。割合が50%を超える場合や最初の区間は「最も多い範囲」と表示します。</p>
       <h3>ゲーム内の周回分布の作り方</h3><p>${generation}</p>${version}`;
   }
-  return disclaimer + `<p>${e(view.startYear)}年に開始 ／ いま登録者 ${number(view.subscribers)}人（ゲーム内）</p>
+  return disclaimer + version + `<p>${e(view.startYear)}年に開始 ／ いま登録者 ${number(view.subscribers)}人（ゲーム内）</p>
     ${view.status === "unavailable" ? '<p role="status">未取得。統計データを読み込めませんでした。</p>' : ""}
     <details open class="lp-group"><summary>ゲーム内の同じ年の人生</summary><p>${badge("placeholder")} ${e(view.main.display)}</p>
       <p class="caption">${view.main.runs ? `${view.main.runs}周回との比較。現実の統計ではありません。` : "同じ開始年・同じ版の周回分布は未取得です。"}</p></details>
@@ -84,7 +84,11 @@ export function mountLifePosition(document, { getController, load = loadStatsDat
     $("observation").hidden = true;
     $("life-position").hidden = false;
     render(); $("lp-heading").focus();
-    pending ??= Promise.resolve().then(load).catch(() => ({ dataset: null }));
+    pending ??= Promise.resolve().then(load).catch(() => ({ dataset: null })).then(result => {
+      // Keep successful reads; reopening can retry failures even after this screen closes.
+      if (!result.dataset) pending = null;
+      return result;
+    });
     const result = await pending;
     if (request !== token) return;
     current = computeLifePosition(result.dataset, runValues(run));

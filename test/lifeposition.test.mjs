@@ -110,6 +110,12 @@ test("AT123/AT124: permanent disclaimer, accessible badges, version notice and l
     const html = renderLifePosition(view, methods);
     assert.ok(html.startsWith('<p class="lp-disclaimer">' + DISCLAIMER + '</p>'));
     assert.doesNotMatch(html, /下位|負け|失敗|dismiss|close-disclaimer/);
+    assert.ok(html.includes(`statsVersion: ${view.statsVersion}`));
+    assert.ok(html.includes("保存時の版 oldとは異なります"));
+    const matching = computeLifePosition(parse(checked()), { ...value, versions: { statsVersion: view.statsVersion } });
+    const matchingHtml = renderLifePosition(matching, methods);
+    assert.ok(matchingHtml.includes(`statsVersion: ${view.statsVersion}`));
+    assert.ok(!matchingHtml.includes("とは異なります"));
   }
   const methods = renderLifePosition(view, true);
   for (const word of ["信頼度", "計算式", "取得日", "シード", "statsVersion", "保存時の版 oldとは異なります"])
@@ -165,6 +171,51 @@ function fakeDocument() {
       addEventListener(name, handler) { this.handlers[name] = handler; }, focus() {} });
   return { getElementById: id => elements.get(id), defaultView: { confirm: () => false } };
 }
+test("AT124/AT125: reopening retries failed reads, including failures after closing, and caches recovery", async t => {
+  for (const rejects of [false, true]) for (const closeEarly of [false, true]) {
+    await t.test(`rejects=${rejects}, closeEarly=${closeEarly}`, async () => {
+      const document = fakeDocument(), $ = document.getElementById;
+      const initialRun = createSimulation(params, createSetup(params, { seed: "m14-retry" }).snapshot());
+      const controller = createObservationController(params, { initialRun, schedule: () => 1, cancel: () => {} });
+      controller.pause();
+      const before = serializeSimulation(params, controller.snapshot().run);
+      let fail, loads = 0;
+      const dataset = parse(raw);
+      mountLifePosition(document, { getController: () => controller, load: () => {
+        loads++;
+        if (loads > 1) return { dataset };
+        return new Promise((resolve, reject) => {
+          fail = () => rejects ? reject(new Error("temporary failure")) : resolve({ dataset: null });
+        });
+      } });
+      try {
+        const opening = $("lp-open").handlers.click();
+        await Promise.resolve();
+        assert.equal(loads, 1);
+        if (closeEarly) $("lp-close").handlers.click();
+        fail();
+        await opening;
+        assert.equal($("life-position").hidden, closeEarly);
+        if (!closeEarly) {
+          assert.ok($("lp-content").innerHTML.includes("統計データを読み込めませんでした"));
+          $("lp-close").handlers.click();
+        }
+        await $("lp-open").handlers.click();
+        assert.equal(loads, 2);
+        assert.ok($("lp-content").innerHTML.includes(`statsVersion: ${dataset.statsVersion}`));
+        assert.ok(!$("lp-content").innerHTML.includes("統計データを読み込めませんでした"));
+        $("lp-close").handlers.click();
+        await $("lp-open").handlers.click();
+        assert.equal(loads, 2);
+        $("lp-close").handlers.click();
+        assert.equal(serializeSimulation(params, controller.snapshot().run), before);
+      } finally {
+        controller.dispose();
+      }
+    });
+  }
+});
+
 test("AT123/AT125: UI reads lazily, hides behind preference, confirms links, and cannot reopen after delayed load", async () => {
   const document = fakeDocument(), $ = document.getElementById;
   const initialRun = createSimulation(params, createSetup(params, { seed: "m14-screen" }).snapshot());
