@@ -32,3 +32,7 @@ M11 landed in 1 commit (564a62b0d5) touching web/index.html, app.js, graph.js, s
 ## M18 Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ...
 
 M18 (rework of M10) landed in 1 commit (5fed88407a) touching docs/DECISIONS.md, docs/spec/params.json, params.md and test/setup.test.mjs. It recorded the q15 answer: the BG22 15% who are not partnered are single parents living with their children. It also updated the params basis to a placeholder that is not a statistic, and added a regression test. Verification passed 2 times (npm test). Review passed with 3 minor findings (the test depends on seeds 8/9 hitting specific branches, and it asserts on basis wording), 0 blockers and 0 fix rounds.
+
+## M12 Events and major choices, heavy events with support notice, marriage/family
+
+M12 landed in 1 commit (fee52390e5) touching DECISIONS, params.js, sim.js, events.js, household.js and events tests. It added events and major choices, heavy events that carry a fixed support notice and are never depicted, and marriage/family flows such as childcare leave and EV27 final end to EPILOGUE. Verification passed 2 times. Review passed with 5 findings, 0 blockers and 0 fix rounds; the EV26/EV27 labels are hardcoded and EV96 wording is open.
