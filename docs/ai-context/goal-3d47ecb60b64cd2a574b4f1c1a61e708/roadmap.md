@@ -2,7 +2,7 @@
 # Roadmap
 
 ```text
-Position: milestone 7 of 11 (M11 in progress)
+Position: milestone 7 of 12 (M11 in progress)
 Current milestone: M11
 Replans used: 0 of 6
 M1 [done] Base: seeded RNG, params loader, calendar boundaries, save data, serve script
@@ -13,6 +13,8 @@ M17 [done] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect per
 M16 [done] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ... (rework)
 M11 [in progress] Observation UI: weekly 3-series graph, radar, log, speed, pause
     files: web/index.html, web/app.js, web/graph.js, web/style.css; accept: AT05: UI actions do not change results; Graph shows the S/G/U series
+M18 [pending] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ... (rework)
+    files: docs/spec/params.json, docs/spec/params.md, src/person.js, src/setup.js, test/setup.test.mjs; accept: Apply the user's answer to goal-3d47ecb60b64cd2a574b4f1c1a61e708-q15: yes
 M12 [pending] Events and major choices, heavy events with support notice, marriage/family
     files: src/events.js, src/household.js, test/events.test.mjs; accept: AT04/AT06 when resuming a pending choice; EV93-96 tests; Heavy events are never removed or reduced
 M13 [pending] Dreams, epilogue, life record, alternate-era comparison
