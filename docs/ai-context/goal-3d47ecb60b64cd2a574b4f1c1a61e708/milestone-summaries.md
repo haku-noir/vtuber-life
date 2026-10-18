@@ -36,3 +36,7 @@ M18 (rework of M10) landed in 1 commit (5fed88407a) touching docs/DECISIONS.md, 
 ## M12 Events and major choices, heavy events with support notice, marriage/family
 
 M12 landed in 1 commit (fee52390e5) touching DECISIONS, params.js, sim.js, events.js, household.js and events tests. It added events and major choices, heavy events that carry a fixed support notice and are never depicted, and marriage/family flows such as childcare leave and EV27 final end to EPILOGUE. Verification passed 2 times. Review passed with 5 findings, 0 blockers and 0 fix rounds; the EV26/EV27 labels are hardcoded and EV96 wording is open.
+
+## M13 Dreams, epilogue, life record, alternate-era comparison
+
+M13 landed in 1 commit (59a97d096d) touching src/dreams.js, epilogue.js, compare.js, sim.js, events.js, test/dreams.test.mjs and DECISIONS. It added dreams, the epilogue, the life record, and the alternate-era comparison (same person, household and initial dream; different start year; reset state). Verification passed 2 times (npm test). Review passed with 5 findings and 0 blockers, including duplicated affiliation re-pick logic in compare.js and hardcoded epilogue strings; 0 fix rounds.
