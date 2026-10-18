@@ -1,4 +1,5 @@
 import { createRng } from "./rng.js";
+import { finishActivity } from "./epilogue.js";
 import { getCandidates, getFamilyEventRules } from "./params.js";
 import { advanceFamilyDates, advanceRelationshipWeek, applyFamilyChoice, birthRoleWording,
   familyEligible, recordHousehold } from "./household.js";
@@ -152,7 +153,7 @@ export function resolveEventChoice(params, run, decisionId, optionId) {
     run.household.activityScale = index ? 1 - getFamilyEventRules(params).ev96.reduction[0] / 100 : 1;
   } else if (pending.eventId === "EV27") {
     run.eventState.graduationRequested = false;
-    if (index === 1) { run.channels[0].status = "retired"; run.state = "EPILOGUE"; }
+    if (index === 1) finishActivity(params, run);
   } else if (HEAVY_EVENT_IDS.includes(pending.eventId)) {
     const label = pending.options[index].label;
     if (/休む|休止/u.test(label)) run.household.leave = { reason: "health", returnDate: null };
@@ -181,6 +182,7 @@ export function validateEventState(params, run) {
     if (!definition(params, record.eventId)) fail("event definition");
     if (HEAVY_EVENT_IDS.includes(record.eventId) && JSON.stringify(record.supportCard) !== JSON.stringify(SUPPORT_CARD)) fail("support card");
   }
+  for (const record of run.events.filter(row => row.kind === "achievement-evidence")) validateAchievementEvidence(record.evidence);
   for (const choice of run.choiceHistory) {
     const record = run.events.find(row => `decision-${row.id}` === choice.decisionId && row.kind === "catalog");
     if (!record || record.eventId !== choice.eventId || record.date !== choice.date ||
@@ -201,4 +203,28 @@ export function validateEventState(params, run) {
         JSON.stringify(pending.options) !== JSON.stringify(optionsFor(params, run, pending.eventId, pending.birthRole))) fail("pending payload");
     if (HEAVY_EVENT_IDS.includes(pending.eventId) && JSON.stringify(pending.supportCard) !== JSON.stringify(SUPPORT_CARD)) fail("pending support");
   }
+}
+
+function validateAchievementEvidence(e) {
+  if (!e || !["concert", "op", "game"].includes(e.type) ||
+      !["announced", "postponed", "cancelled", "held", "released"].includes(e.status)) fail("achievement evidence");
+  if (e.type === "concert" && (!Number.isSafeInteger(e.localAudience) || e.localAudience < 0 ||
+      !["solo", "unit-lead", "guest"].includes(e.role) || !Array.isArray(e.venueAttributes) ||
+      e.venueAttributes.some(value => !["arena", "symbolic", "dome"].includes(value)) || typeof e.allOriginal !== "boolean")) fail("concert evidence");
+  if (e.type === "op" && (![e.official, e.singingCredit, e.cover].every(value => typeof value === "boolean") ||
+      !["OP", "ED", "insert", "game-theme"].includes(e.usage))) fail("OP evidence");
+  if (e.type === "game" && ![e.licensed, e.centralIP, e.complete, e.publiclyPlayable].every(value => typeof value === "boolean")) fail("game evidence");
+}
+
+// Called by a completed project/scripted event, never by choosing a dream.
+export function appendAchievementEvidence(run, evidenceId, evidence) {
+  validateAchievementEvidence(evidence);
+  if (typeof evidenceId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(evidenceId)) fail("evidence ID");
+  const previous = run.events.find(row => row.id === evidenceId);
+  if (previous) {
+    if (previous.kind !== "achievement-evidence" || JSON.stringify(previous.evidence) !== JSON.stringify(evidence)) fail("conflicting evidence replay");
+    return;
+  }
+  run.events.push({ id: evidenceId, kind: "achievement-evidence", date: run.calendar.currentDate,
+    evidence: structuredClone(evidence) });
 }

@@ -4,10 +4,13 @@ import { createSave, SAVE_VERSIONS, validateSave, serializeSave, loadSave } from
 import { beginMonth, finishMonth, dailyAvailableHours } from "./economy.js";
 import { advanceActivityDay } from "./activity.js";
 import { createHouseholdState, validateHousehold } from "./household.js";
-import { createEventState, advanceEvents, offerEvent, resolveEventChoice, validateEventState } from "./events.js";
+import { createEventState, advanceEvents, offerEvent, resolveEventChoice, validateEventState, appendAchievementEvidence } from "./events.js";
+import { initializeDreams, checkDreams, validateDreams, selectDream, setDreamStatus, discloseDream,
+  carryDreams, markDreamPresentationSeen } from "./dreams.js";
+import { createLifeSnapshot, finishActivity, buildRunSummary, validateEnding } from "./epilogue.js";
 
 export const SIM_VERSIONS = Object.freeze({ ...SAVE_VERSIONS,
-  simulationVersion: "sim-0.3.0", balanceVersion: BALANCE_VERSION });
+  simulationVersion: "sim-0.4.0", balanceVersion: BALANCE_VERSION });
 const clone = value => structuredClone(value);
 const fail = message => { throw new TypeError(`Invalid simulation: ${message}`); };
 const finite = (value, max = Number.MAX_SAFE_INTEGER) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= max;
@@ -26,7 +29,8 @@ function checkInitial(person, policy, balance) {
 
 function weekAt(run) {
   return { weekIndex: run.calendar.weekIndex, startDate: run.calendar.weekStart,
-    endDate: run.calendar.currentDate, channelId: "channel-1", subscribersStart: run.channels[0].subscribers,
+    observedStartDate: run.channels[0].startDate > run.calendar.weekStart ? run.channels[0].startDate : run.calendar.weekStart,
+    endDate: run.calendar.currentDate, channelId: run.channels[0].id, subscribersStart: run.channels[0].subscribers,
     S: run.channels[0].subscribers, G: 0, U: 0, C: null, viewerMinutes: 0, streamMinutes: 0,
     videoViewsThisWeek: 0, partial: true };
 }
@@ -45,7 +49,8 @@ export function createSimulation(params, { seed, personTemplate, runSetupTemplat
   run.runSetupTemplate = clone(runSetupTemplate);
   run.policy = clone(runSetupTemplate.policy);
   run.persons = [{ id: "person-1" }];
-  run.channels = [{ id: "channel-1", personId: "person-1", subscribers: 0, status: "active" }];
+  run.channels = [{ id: "channel-1", personId: "person-1", subscribers: 0, status: "active",
+    startDate: run.calendar.startDate, endDate: null, streamNewSubscribers: 0 }];
   run.abilities = clone(personTemplate.abilities);
   run.debutAbilities = clone(personTemplate.abilities);
   run.fatigue = 0;
@@ -55,9 +60,15 @@ export function createSimulation(params, { seed, personTemplate, runSetupTemplat
   run.economy = { month: null, summaries: [], unmetLivingYen: 0, reservedProductionYen: 0 };
   run.weekProgress = weekAt(run);
   run.lifeSnapshot = null;
+  run.epilogue = null;
+  run.runSummary = null;
+  run.channelWeekSegments = [];
+  run.initialAffiliation = personTemplate.initialAffiliation ?? null;
+  run.comparison = null;
   run.household = createHouseholdState(personTemplate.household);
   for (const row of [...run.household.relationships, ...run.household.children]) run.persons.push({ id: row.id });
   run.eventState = createEventState(params, run);
+  initializeDreams(params, run);
   return validateSimulation(params, run);
 }
 
@@ -65,11 +76,15 @@ export function validateSimulation(params, run) {
   const balance = getSimBalance(params);
   validateSave(run, SIM_VERSIONS);
   checkInitial(run.personTemplate, run.policy, balance);
-  if (run.channels.length !== 1 || run.channels[0].id !== "channel-1" ||
-      !["active", "retired"].includes(run.channels[0].status) ||
-      (run.channels[0].status === "retired") !== (run.state === "EPILOGUE")) fail("channel");
+  if (!run.channels.length || run.channels.some((channel, i) =>
+      channel.id !== `channel-${run.channels.length - i}` || !money(channel.subscribers) || !money(channel.streamNewSubscribers) ||
+      !["active", "retired"].includes(channel.status) || (i > 0 && channel.status !== "retired") ||
+      channel.startDate < run.calendar.startDate || channel.startDate > run.calendar.currentDate ||
+      (channel.status === "retired" && (!channel.endDate || channel.endDate > run.calendar.currentDate)))) fail("channel");
   validateHousehold(run);
   validateEventState(params, run);
+  validateDreams(params, run);
+  validateEnding(run);
   for (const axis of ABILITY_AXES) {
     if (!finite(run.abilities?.[axis], balance.ability.max) ||
         run.debutAbilities?.[axis] !== run.personTemplate.abilities[axis]) fail("ability state");
@@ -82,24 +97,35 @@ export function validateSimulation(params, run) {
       !money(run.activity.streamNewSubscribers)) fail("activity cursor");
   if (!Array.isArray(run.releases) || run.releases.length !== run.works.length) fail("release table");
   const releases = new Set();
-  let contributed = run.activity.streamNewSubscribers;
+  const contributed = new Map(run.channels.map((row, i) => [row.id, i === 0 ? run.activity.streamNewSubscribers : row.streamNewSubscribers]));
   for (let i = 0; i < run.releases.length; i++) {
     const release = run.releases[i], work = run.works[i];
     if (typeof release.id !== "string" || releases.has(release.id) || release.workId !== work.id ||
         release.releaseDate !== work.releaseDate || !Object.hasOwn(balance.formats, work.format) ||
         !finite(work.quality, 1) || release.views !== work.views || release.newSubscribers !== work.newSubscribers ||
         !money(release.weekViews) || !money(release.weekIndex)) fail("release record");
-    releases.add(release.id); contributed += release.newSubscribers;
+    releases.add(release.id); contributed.set(work.channelId, contributed.get(work.channelId) + release.newSubscribers);
   }
-  let subscribers = 0, acquired = 0;
-  const weeks = [...run.weeklySnapshots, ...(run.weekProgress ? [run.weekProgress] : [])];
+  const subscribers = new Map(run.channels.map(row => [row.id, 0])), acquired = new Map(subscribers);
+  if (!Array.isArray(run.channelWeekSegments)) fail("channel segments");
+  for (const segment of run.channelWeekSegments) {
+    dayNumber(segment.startDate); dayNumber(segment.endDate); dayNumber(segment.observedStartDate);
+    if (segment.observedStartDate < segment.startDate || segment.endDate < segment.observedStartDate ||
+        segment.endDate > run.calendar.currentDate || daysBetween(segment.startDate, segment.endDate) > 7 ||
+        ![segment.G, segment.U, segment.S].every(value => money(value)) ||
+        !finite(segment.viewerMinutes) || !finite(segment.streamMinutes) ||
+        segment.C !== (segment.streamMinutes ? segment.viewerMinutes / segment.streamMinutes : null)) fail("channel segment");
+  }
+  const weeks = [...run.weeklySnapshots, ...run.channelWeekSegments, ...(run.weekProgress ? [run.weekProgress] : [])]
+    .sort((a, b) => a.endDate.localeCompare(b.endDate));
   for (const week of weeks) {
-    if (week.subscribersStart !== subscribers || week.S !== subscribers + week.G - week.U ||
+    const previous = subscribers.get(week.channelId);
+    if (week.subscribersStart !== previous || week.S !== previous + week.G - week.U ||
         !money(week.videoViewsThisWeek)) fail("weekly conservation");
-    subscribers = week.S; acquired += week.G;
+    subscribers.set(week.channelId, week.S); acquired.set(week.channelId, acquired.get(week.channelId) + week.G);
   }
-  if (run.weeklySnapshots.length !== run.calendar.weekIndex || subscribers !== run.channels[0].subscribers ||
-      acquired !== contributed) fail("audience totals");
+  if (run.weeklySnapshots.length !== run.calendar.weekIndex || run.channels.some(row =>
+      subscribers.get(row.id) !== row.subscribers || acquired.get(row.id) !== contributed.get(row.id))) fail("audience totals");
   if (!run.economy || !money(run.economy.unmetLivingYen) || !money(run.economy.reservedProductionYen) ||
       run.economy.reservedProductionYen > run.ledger.balanceYen || !Array.isArray(run.economy.summaries)) fail("economy");
   if (run.economy.summaries.length !== run.ledger.settledMonths.length) fail("monthly settlement count");
@@ -130,10 +156,39 @@ export function validateSimulation(params, run) {
   if (run.economy.month && !settled.has(run.economy.month.yearMonth)) unmet += run.economy.month.unmetLivingYen;
   if (unmet !== run.economy.unmetLivingYen) fail("unmet living total");
   const finished = run.calendar.currentDate === run.calendar.endDate;
-  if (finished !== (run.state === "RESULT") || (finished && (run.weekProgress !== null ||
+  if ((finished && run.state !== "RESULT") || (finished && (run.weekProgress !== null ||
       run.lifeSnapshot?.reason !== "observation-limit" || run.lifeSnapshot?.activityStatus !== "continuing"))) fail("end state");
   if (!finished && run.weekProgress === null) fail("missing partial week");
   return run;
+}
+
+// Adapt the existing single-channel daily engine on a private draft. Closed
+// channels keep their works/receipts as history; reuse requires a future rights model.
+function advanceCurrentChannel(run, date, balance) {
+  const allWorks = run.works, allReleases = run.releases, channelId = run.channels[0].id;
+  const indices = allWorks.map((row, i) => row.channelId === channelId ? i : -1).filter(i => i >= 0);
+  run.works = indices.map(i => allWorks[i]); run.releases = indices.map(i => allReleases[i]);
+  const oldCount = run.works.length, entryCount = run.ledger.entries.length, eventCount = run.events.length;
+  try {
+    advanceActivityDay(run, date, balance);
+    const workIds = new Map(), releaseIds = new Map();
+    for (let i = oldCount; i < run.works.length; i++) {
+      const work = run.works[i], release = run.releases[i];
+      const id = `${channelId}-work-${i + 1}`, rid = `${channelId}-release-${i + 1}`;
+      workIds.set(work.id, id); releaseIds.set(release.id, rid);
+      work.id = id; work.channelId = channelId; release.id = rid; release.workId = id;
+      allWorks.push(work); allReleases.push(release);
+    }
+    for (const entry of run.ledger.entries.slice(entryCount)) if (workIds.has(entry.workId)) {
+      entry.workId = workIds.get(entry.workId); entry.transactionId = `production-${entry.workId}`;
+    }
+    for (const event of run.events.slice(eventCount)) {
+      if (workIds.has(event.workId)) event.workId = workIds.get(event.workId);
+      if (event.kind === "publication") event.id = `published-${event.workId}`;
+      for (const [oldId, id] of releaseIds) if (event.id.startsWith(`rediscovery-${oldId}-`))
+        event.id = event.id.replace(`rediscovery-${oldId}-`, `rediscovery-${id}-`);
+    }
+  } finally { run.works = allWorks; run.releases = allReleases; }
 }
 
 function advanceDraft(params, run, balance, eventDates) {
@@ -165,7 +220,7 @@ function advanceDraft(params, run, balance, eventDates) {
         h.weekLoad.days++;
         const savedLesson = run.economy.month.lessonHoursPerDay;
         if (h.leave) run.economy.month.lessonHoursPerDay = 0;
-        try { advanceActivityDay(run, date, balance); }
+        try { advanceCurrentChannel(run, date, balance); }
         finally { run.economy.month.lessonHoursPerDay = savedLesson; }
       } finally { run.policy = policy; }
     } finally { run.personTemplate = template; }
@@ -175,6 +230,7 @@ function advanceDraft(params, run, balance, eventDates) {
   // beginning at the end cursor is opened only when its first day is simulated.
   if (step.boundary.kinds.includes("month") || step.boundary.kinds.includes("end")) finishMonth(run, balance);
   run.calendar = step.calendar;
+  checkDreams(params, run);
   if (step.completedWeek) {
     run.weekProgress.partial = step.completedWeek.partial;
     run.weeklySnapshots.push(run.weekProgress);
@@ -182,14 +238,14 @@ function advanceDraft(params, run, balance, eventDates) {
   }
   if (step.boundary.kinds.includes("end")) {
     run.state = "RESULT";
-    run.lifeSnapshot = { date: run.calendar.endDate, reason: "observation-limit", activityStatus: "continuing",
-      balanceYen: run.ledger.balanceYen, unmetLivingYen: run.economy.unmetLivingYen,
-      workCount: run.works.length, subscribers: run.channels[0].subscribers };
+    run.lifeSnapshot = createLifeSnapshot(run, "observation-limit");
+    run.runSummary = buildRunSummary(run);
   } else advanceEvents(params, run, { week: !!step.completedWeek, month: step.boundary.kinds.includes("month") });
 }
 
 export function advanceToBoundary(params, run, eventDates = []) {
   validateSimulation(params, run);
+  if (run.state === "EPILOGUE") return completeEpilogue(params, run);
   if (run.state !== "RUNNING" || run.pendingDecision) return run;
   const next = clone(run);
   advanceDraft(params, next, getSimBalance(params), eventDates);
@@ -201,6 +257,7 @@ export function advanceToBoundary(params, run, eventDates = []) {
 export function runToEnd(params, run, maxBoundaries = Number.MAX_SAFE_INTEGER) {
   validateSimulation(params, run);
   if (!Number.isSafeInteger(maxBoundaries) || maxBoundaries < 0) fail("boundary budget");
+  if (run.state === "EPILOGUE" && maxBoundaries) return completeEpilogue(params, run);
   if (run.state !== "RUNNING" || run.pendingDecision || !maxBoundaries) return run;
   const next = clone(run), balance = getSimBalance(params);
   for (let i = 0; i < maxBoundaries && next.state === "RUNNING" && !next.pendingDecision; i++)
@@ -244,6 +301,88 @@ export function respondToRelationshipWarning(params, run, response) {
 export function serializeSimulation(params, run) {
   validateSimulation(params, run);
   return serializeSave(run, SIM_VERSIONS);
+}
+
+export function changeDream(params, run, selection) {
+  validateSimulation(params, run);
+  if (!["RUNNING", "PAUSED", "CHOICE"].includes(run.state)) fail("dream editing after ending");
+  const next = clone(run);
+  checkDreams(params, next);
+  selectDream(params, next, selection);
+  return validateSimulation(params, next);
+}
+
+export function updateDream(params, run, action) {
+  validateSimulation(params, run);
+  if (!["RUNNING", "PAUSED", "CHOICE"].includes(run.state)) fail("dream editing after ending");
+  const next = clone(run);
+  if (action === "public") discloseDream(next);
+  else setDreamStatus(next, action);
+  checkDreams(params, next);
+  return validateSimulation(params, next);
+}
+
+export function acknowledgeDreamPresentation(params, run, id) {
+  validateSimulation(params, run);
+  const next = clone(run);
+  markDreamPresentationSeen(next, id);
+  if (next.state === "RESULT") next.runSummary = buildRunSummary(next);
+  return validateSimulation(params, next);
+}
+
+export function recordAchievementEvent(params, run, evidenceId, evidence) {
+  validateSimulation(params, run);
+  if (!["RUNNING", "PAUSED"].includes(run.state) || run.pendingDecision) fail("achievement event state");
+  const next = clone(run);
+  appendAchievementEvidence(next, evidenceId, evidence);
+  checkDreams(params, next);
+  return validateSimulation(params, next);
+}
+
+export function endActivity(params, run) {
+  validateSimulation(params, run);
+  if (!["RUNNING", "PAUSED"].includes(run.state) || run.pendingDecision) fail("final ending state");
+  const next = clone(run);
+  finishActivity(params, next);
+  return validateSimulation(params, next);
+}
+
+export function completeEpilogue(params, run) {
+  validateSimulation(params, run);
+  if (run.state !== "EPILOGUE") return run;
+  const next = clone(run);
+  next.state = "RESULT"; next.runSummary = buildRunSummary(next);
+  return validateSimulation(params, next);
+}
+
+export function stopObservation(params, run) {
+  validateSimulation(params, run);
+  if (!["RUNNING", "PAUSED"].includes(run.state) || run.pendingDecision) fail("observation state");
+  const next = clone(run);
+  checkDreams(params, next);
+  next.state = "RESULT"; next.lifeSnapshot = createLifeSnapshot(next, "observation-stop");
+  next.runSummary = buildRunSummary(next);
+  return validateSimulation(params, next);
+}
+
+export function rebirth(params, run, { dreamAction = "hold" } = {}) {
+  validateSimulation(params, run);
+  if (!["RUNNING", "PAUSED"].includes(run.state) || run.pendingDecision || !["hold", "retarget"].includes(dreamAction)) fail("rebirth state");
+  const next = clone(run), old = next.channels[0];
+  checkDreams(params, next);
+  old.status = "retired"; old.endDate = next.calendar.currentDate;
+  old.streamNewSubscribers = next.activity.streamNewSubscribers;
+  if (next.weekProgress.endDate > next.weekProgress.observedStartDate || next.weekProgress.G || next.weekProgress.U)
+    next.channelWeekSegments.push(clone(next.weekProgress));
+  next.channels.unshift({ id: `channel-${next.channels.length + 1}`, personId: "person-1", subscribers: 0,
+    status: "active", startDate: next.calendar.currentDate, endDate: null, streamNewSubscribers: 0 });
+  next.activity = { productionHours: 0, streamHours: 0, regularViewers: 0, streamNewSubscribers: 0,
+    projectStartDate: next.calendar.currentDate };
+  next.weekProgress = weekAt(next);
+  carryDreams(next, old.id, dreamAction);
+  next.events.push({ id: `rebirth-${next.channels[0].id}`, kind: "rebirth", date: next.calendar.currentDate,
+    channelId: next.channels[0].id, previousChannelId: old.id, dreamAction, disclosure: "private" });
+  return validateSimulation(params, next);
 }
 
 export function loadSimulation(params, text) {
