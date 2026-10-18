@@ -8,3 +8,7 @@ M1 added the base layer in 1 commit (0ea340b): a seeded RNG with named streams, 
 ## M2 Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
 
 M2 landed in 2 commits (aec08f95fb, 9cd3214c75) touching person.js, seedcode.js, setup.js, setup tests and DECISIONS. It added QS1-3 setup sessions, a fixed person draft (start date only; other fields stay null until data exists), V setup generation with reroll, lock and undo, P-14 compatibility weights, a standalone household generator and a binary seed-code codec. Verification passed 4 times; review passed with 3 findings, 0 blockers and 1 fix round.
+
+## M9 Weekly auto-advance: abilities, activities, money, WeeklySnapshot, run loop
+
+M9 landed in 1 commit (e890942f84) touching sim.js, activity.js, economy.js, params.js, params.json/md, DECISIONS and sim tests. It added a weekly auto-advance with abilities, activities, money, WeeklySnapshot and the run loop, driven by createSimulation using explicit person and run-setup templates. Verification passed 2 times; review passed with 3 minor findings, 0 blockers and 0 fix rounds.

@@ -2,13 +2,13 @@
 # Roadmap
 
 ```text
-Position: 3 of 9 milestones done; the next one is being planned
-Current milestone: none
+Position: milestone 4 of 9 (M10 in progress)
+Current milestone: M10
 Replans used: 0 of 6
 M1 [done] Base: seeded RNG, params loader, calendar boundaries, save data, serve script
 M2 [done] Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
 M9 [done] Weekly auto-advance: abilities, activities, money, WeeklySnapshot, run loop
-M10 [pending] Data: P-18 distributions, name ledger, BG22 rule, connect person and household
+M10 [in progress] Data: P-18 distributions, name ledger, BG22 rule, connect person and household
     files: docs/spec/params.json, docs/spec/params.md, src/person.js, src/setup.js, test/setup.test.mjs; accept: setup.ready is true for QS1 on all start years (AT01/AT02); Seed code round-trips through the edi...
 M11 [pending] Observation UI: weekly 3-series graph, radar, log, speed, pause
     files: web/index.html, web/app.js, web/graph.js, web/style.css; accept: AT05: UI actions do not change results; Graph shows the S/G/U series
