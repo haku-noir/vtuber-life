@@ -106,7 +106,82 @@ export function validateParams(data) {
     if (typeof level !== "number" || !Number.isFinite(level) || level < 0) fail("compatibility weight");
   getObservationMonths(data);
   getSimBalance(data);
+  getFamilyEventRules(data);
   return data;
+}
+
+const familyCache = new WeakMap();
+// P-21 currently stores its numbers in prose. Parse only the documented grammar;
+// never evaluate text or substitute guessed values for unresolved tuning.
+export function getFamilyEventRules(params) {
+  if (Object.isFrozen(params) && familyCache.has(params)) return familyCache.get(params);
+  const source = params.collections.familyEventParams;
+  const event = id => params.collections.events.find(row => row.id === id);
+  const capture = (text, pattern) => {
+    const match = typeof text === "string" && pattern.exec(text);
+    if (!match) fail("P-21 grammar");
+    return match.slice(1).map(value => Number(value.replaceAll("−", "-")));
+  };
+  const range = text => capture(text, /([−+]?\d+)～([−+]?\d+)/u);
+  const c93 = capture(event("EV93")?.conditionsAndBehavior,
+    /^既婚またはパートナー同居、良好度≥(\d+)、本人の実年齢(\d+)～(\d+)歳、子の人数≤(\d+)。一周に最大(\d+)回。\(ii\)\(iv\)の後は(\d+)か月以上あける$/u);
+  const w93 = capture(event("EV93")?.weight.text, /^月([\d.]+)（子が(\d+)人以上なら×([\d.]+)）$/u);
+  const c94 = capture(event("EV94")?.conditionsAndBehavior, /^関係ごとの緊張度≥(\d+)$/u);
+  const c95 = capture(event("EV95")?.conditionsAndBehavior, /^EV94が同じ相手で(\d+)回以上、かつ緊張度≥(\d+)$/u);
+  const coefficients = source.strainCoefficients;
+  if (!Array.isArray(coefficients) || coefficients.length !== 8 || source.noCorrectAnswer !== true || source.directPenalty !== false)
+    fail("P-21 strain/choice policy");
+  const activity = capture(coefficients[0].要因, /^週の活動時間が(\d+)時間超$/u)[0];
+  const consecutive = capture(coefficients[1].要因, /^(\d+)時間超が(\d+)週以上連続$/u);
+  if (activity !== consecutive[0]) fail("P-21 overwork thresholds");
+  const strain = {
+    activity, consecutive: consecutive[1],
+    privateHours: capture(coefficients[2].要因, /^私生活の時間が週(\d+)時間未満$/u)[0],
+    neglect: capture(coefficients[3].要因, /^相手と十分な時間を過ごしていない週が(\d+)週以上$/u)[0],
+    changes: coefficients.map(row => capture(row.変化, /([+−]\d+)/u)[0]),
+  };
+  if (source.ev93Choices?.length !== 4 || source.ev95Choices?.length !== 4 || source.ev96Choices?.length !== 4)
+    fail("P-21 choices");
+  const a = source.ev93Choices;
+  const leave = capture(a[0]["休止・復帰"], /^birthRole本人：休止(\d+)～(\d+)か月／パートナー：育児休業(\d+)～(\d+)か月。授かるまで(\d+)～(\d+)か月（一様）$/u);
+  const probabilities = source.ev95Choices.map((row, i) => i === 2 ? null :
+    ["話し合いで続く", "疎遠（友人）／距離を置く", "別れる"].map(key => capture(row[key], /^([\d.]+)→([\d.]+)$/u)));
+  for (const row of probabilities.filter(Boolean)) for (let end = 0; end < 2; end++)
+    if (row.some(pair => pair[end] < 0 || pair[end] > 1) || Math.abs(row.reduce((n, pair) => n + pair[end], 0) - 1) > 1e-9)
+      fail("P-21 outcome probabilities");
+  // The third outcome is categorical, not an inferred probability.
+  const accept = source.ev95Choices[2];
+  if (accept["話し合いで続く"] !== "0.00" || accept["疎遠（友人）／距離を置く"] !== "友人は1.00（疎遠）／パートナーは0.00" ||
+      accept["別れる"] !== "パートナーは1.00") fail("P-21 accepted ending");
+  const child = key => params.collections.householdInitial.children.find(row => row.項目 === key)?.値;
+  const care = capture(child("育児負荷（週の時間、子1人あたり）"), /^(\d+)～(\d+)歳(\d+)時間、(\d+)～(\d+)歳(\d+)時間、(\d+)～(\d+)歳(\d+)時間、(\d+)～(\d+)歳(\d+)時間。2人目以降は×([\d.]+)$/u);
+  const rules = {
+    strain,
+    ev93: { quality: c93[0], minAge: c93[1], maxAge: c93[2], maxChildren: c93[3], maxCount: c93[4], cooldown: c93[5],
+      chance: event("EV93").weight.value ?? w93[0], childThreshold: w93[1], childMultiplier: w93[2],
+      qualityChanges: a.map(row => range(row["パートナー関係（良好度）"])),
+      selfLeave: leave.slice(0, 2), partnerLeave: leave.slice(2, 4), birthDelay: leave.slice(4, 6),
+      shortLeave: range(a[2]["休止・復帰"]), reductions: [range(a[0].活動時間).map(Math.abs).sort((x,y) => x-y),
+        range(a[2].活動時間).map(Math.abs).sort((x,y) => x-y)], defer: range(a[3]["休止・復帰"]) },
+    ev94: { threshold: c94[0], chance: event("EV94").weight.value ?? capture(event("EV94")?.weight.text, /^条件を満たした週に([\d.]+)$/u)[0] },
+    ev95: { warnings: c95[0], threshold: c95[1], chance: event("EV95").weight.value ?? capture(event("EV95")?.weight.text, /^条件を満たした月に([\d.]+)$/u)[0], probabilities },
+    ev96: { reduction: range(source.ev96Choices[1]).map(Math.abs).sort((x,y) => x-y), extension: range(source.ev96Choices[2]) },
+    birthRoleWeights: capture(child("birthRole"), /^子の計画がある場合、本人([\d.]+)／パートナー([\d.]+)（性別を推定しない）$/u),
+    careBands: Array.from({ length: 4 }, (_, i) => care.slice(i * 3, i * 3 + 3)), siblingFactor: care[12],
+    choices: { EV93: a.map(row => row.選択肢), EV95: source.ev95Choices.map(row => row.選択肢), EV96: [...source.ev96Choices] },
+  };
+  if (event("EV96")?.weight.text !== "条件で確定") fail("P-21 return condition");
+  for (const value of [rules.ev93.chance, rules.ev93.childMultiplier, rules.ev94.chance, rules.ev95.chance, ...rules.birthRoleWeights])
+    if (!Number.isFinite(value) || value < 0 || value > 1) fail("P-21 probability");
+  for (const bounds of [...rules.ev93.qualityChanges, rules.ev93.selfLeave, rules.ev93.partnerLeave, rules.ev93.birthDelay,
+    rules.ev93.shortLeave, ...rules.ev93.reductions, rules.ev93.defer, rules.ev96.reduction, rules.ev96.extension])
+    if (bounds.some(value => !Number.isSafeInteger(value)) || bounds[0] > bounds[1]) fail("P-21 range");
+  if (rules.ev93.minAge > rules.ev93.maxAge || rules.ev93.quality > 100 || rules.ev94.threshold > 100 ||
+      rules.ev95.threshold >= 100 || rules.ev95.warnings < 1 || rules.ev93.maxCount < 1 ||
+      rules.ev96.reduction[1] > 100 || rules.ev93.reductions.some(pair => pair[1] > 100) ||
+      rules.birthRoleWeights.reduce((a, b) => a + b, 0) <= 0) fail("P-21 bounds");
+  if (Object.isFrozen(params)) familyCache.set(params, deepFreeze(rules));
+  return rules;
 }
 
 // All tuning values, including format allocation and growth, come from P-22.

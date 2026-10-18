@@ -1,11 +1,13 @@
 import { ABILITY_AXES, BALANCE_VERSION, getSimBalance, validateParams } from "./params.js";
 import { addDays, advanceCalendar, dayNumber, daysBetween } from "./calendar.js";
 import { createSave, SAVE_VERSIONS, validateSave, serializeSave, loadSave } from "./save.js";
-import { beginMonth, finishMonth } from "./economy.js";
+import { beginMonth, finishMonth, dailyAvailableHours } from "./economy.js";
 import { advanceActivityDay } from "./activity.js";
+import { createHouseholdState, validateHousehold } from "./household.js";
+import { createEventState, advanceEvents, offerEvent, resolveEventChoice, validateEventState } from "./events.js";
 
 export const SIM_VERSIONS = Object.freeze({ ...SAVE_VERSIONS,
-  simulationVersion: "sim-0.2.0", balanceVersion: BALANCE_VERSION });
+  simulationVersion: "sim-0.3.0", balanceVersion: BALANCE_VERSION });
 const clone = value => structuredClone(value);
 const fail = message => { throw new TypeError(`Invalid simulation: ${message}`); };
 const finite = (value, max = Number.MAX_SAFE_INTEGER) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= max;
@@ -53,6 +55,9 @@ export function createSimulation(params, { seed, personTemplate, runSetupTemplat
   run.economy = { month: null, summaries: [], unmetLivingYen: 0, reservedProductionYen: 0 };
   run.weekProgress = weekAt(run);
   run.lifeSnapshot = null;
+  run.household = createHouseholdState(personTemplate.household);
+  for (const row of [...run.household.relationships, ...run.household.children]) run.persons.push({ id: row.id });
+  run.eventState = createEventState(params, run);
   return validateSimulation(params, run);
 }
 
@@ -60,7 +65,11 @@ export function validateSimulation(params, run) {
   const balance = getSimBalance(params);
   validateSave(run, SIM_VERSIONS);
   checkInitial(run.personTemplate, run.policy, balance);
-  if (run.channels.length !== 1 || run.channels[0].id !== "channel-1" || run.channels[0].status !== "active") fail("channel");
+  if (run.channels.length !== 1 || run.channels[0].id !== "channel-1" ||
+      !["active", "retired"].includes(run.channels[0].status) ||
+      (run.channels[0].status === "retired") !== (run.state === "EPILOGUE")) fail("channel");
+  validateHousehold(run);
+  validateEventState(params, run);
   for (const axis of ABILITY_AXES) {
     if (!finite(run.abilities?.[axis], balance.ability.max) ||
         run.debutAbilities?.[axis] !== run.personTemplate.abilities[axis]) fail("ability state");
@@ -127,11 +136,39 @@ export function validateSimulation(params, run) {
   return run;
 }
 
-function advanceDraft(run, balance, eventDates) {
-  const step = advanceCalendar(run.calendar, eventDates);
+function advanceDraft(params, run, balance, eventDates) {
+  const dates = [...eventDates, run.household.pendingBirth?.date, run.household.leave?.returnDate]
+    .filter(date => date && date > run.calendar.currentDate);
+  const step = advanceCalendar(run.calendar, dates);
   for (let date = run.calendar.currentDate; date < step.calendar.currentDate; date = addDays(date, 1)) {
-    beginMonth(run, date, balance);
-    advanceActivityDay(run, date, balance);
+    const template = run.personTemplate, h = run.household;
+    const baseCare = template.household?.childcareHoursPerWeek ?? 0;
+    const life = { ...template.life, careHoursPerWeek: Math.max(0, template.life.careHoursPerWeek - baseCare + h.childcareHoursPerWeek) };
+    const available = dailyAvailableHours(life, balance);
+    const scale = h.leave ? 0 : h.activityScale;
+    life.careHoursPerWeek += available * 7 * (1 - scale);
+    // Existing activity/economy functions consume life via PersonTemplate. Supply
+    // a scoped runtime view on the private draft and restore the fixed template.
+    run.personTemplate = { ...template, life };
+    try {
+      const policy = run.policy;
+      if (h.leave) run.policy = { ...policy, voiceTraining: false, liveMode: "off" };
+      try {
+        beginMonth(run, date, balance);
+        const lesson = h.leave ? 0 : run.economy.month.lessonHoursPerDay;
+        const hours = Math.max(0, dailyAvailableHours(life, balance) - lesson) *
+          (1 - balance.time.maxFatigueReduction * run.fatigue / balance.time.fatigueLimit);
+        const f = balance.formats[run.policy.format];
+        h.weekLoad.activityHours += lesson + hours * (f.productionShare + f.practiceShare +
+          (run.policy.liveMode === "regular" ? f.streamShare : 0));
+        h.weekLoad.privateHours += balance.time.lifeHoursPerDay + available * (1 - scale);
+        h.weekLoad.days++;
+        const savedLesson = run.economy.month.lessonHoursPerDay;
+        if (h.leave) run.economy.month.lessonHoursPerDay = 0;
+        try { advanceActivityDay(run, date, balance); }
+        finally { run.economy.month.lessonHoursPerDay = savedLesson; }
+      } finally { run.policy = policy; }
+    } finally { run.personTemplate = template; }
   }
   run.weekProgress.endDate = step.calendar.currentDate;
   // Income for the closing month is booked before the week's snapshot. A month
@@ -148,14 +185,14 @@ function advanceDraft(run, balance, eventDates) {
     run.lifeSnapshot = { date: run.calendar.endDate, reason: "observation-limit", activityStatus: "continuing",
       balanceYen: run.ledger.balanceYen, unmetLivingYen: run.economy.unmetLivingYen,
       workCount: run.works.length, subscribers: run.channels[0].subscribers };
-  }
+  } else advanceEvents(params, run, { week: !!step.completedWeek, month: step.boundary.kinds.includes("month") });
 }
 
 export function advanceToBoundary(params, run, eventDates = []) {
   validateSimulation(params, run);
   if (run.state !== "RUNNING" || run.pendingDecision) return run;
   const next = clone(run);
-  advanceDraft(next, getSimBalance(params), eventDates);
+  advanceDraft(params, next, getSimBalance(params), eventDates);
   return validateSimulation(params, next);
 }
 
@@ -167,15 +204,41 @@ export function runToEnd(params, run, maxBoundaries = Number.MAX_SAFE_INTEGER) {
   if (run.state !== "RUNNING" || run.pendingDecision || !maxBoundaries) return run;
   const next = clone(run), balance = getSimBalance(params);
   for (let i = 0; i < maxBoundaries && next.state === "RUNNING" && !next.pendingDecision; i++)
-    advanceDraft(next, balance, []);
+    advanceDraft(params, next, balance, []);
   return validateSimulation(params, next);
 }
 
 export function setPaused(params, run, paused) {
   validateSimulation(params, run);
   if (typeof paused !== "boolean") fail("pause flag");
-  if (!["RUNNING", "PAUSED"].includes(run.state)) return run;
+  if (!["RUNNING", "PAUSED", "CHOICE"].includes(run.state)) return run;
   return { ...run, state: paused ? "PAUSED" : run.pendingDecision ? "CHOICE" : "RUNNING" };
+}
+
+export function answerDecision(params, run, decisionId, optionId) {
+  validateSimulation(params, run);
+  const next = clone(run);
+  if (!resolveEventChoice(params, next, decisionId, optionId)) return run;
+  if (run.state === "PAUSED" && next.state !== "EPILOGUE") next.state = "PAUSED";
+  return validateSimulation(params, next);
+}
+
+// For scripted events and an explicitly requested early return from leave.
+export function requestEvent(params, run, eventId, relationshipId = null) {
+  validateSimulation(params, run);
+  const next = clone(run);
+  offerEvent(params, next, eventId, relationshipId);
+  return validateSimulation(params, next);
+}
+
+export function respondToRelationshipWarning(params, run, response) {
+  validateSimulation(params, run);
+  if (!["together", "discussion", "unchanged"].includes(response)) fail("relationship response");
+  if (!["RUNNING", "PAUSED"].includes(run.state) || run.pendingDecision ||
+      !run.household.relationships.some(row => row.warnings > 0)) return run;
+  const next = clone(run);
+  next.household.weeklyResponse = response;
+  return validateSimulation(params, next);
 }
 
 export function serializeSimulation(params, run) {
