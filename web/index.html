@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>VTuberの一生</title>
+  <link rel="stylesheet" href="/web/style.css">
+  <script type="module" src="/web/app.js"></script>
+</head>
+<body>
+  <main>
+    <header class="masthead"><span class="brand-mark" aria-hidden="true">◯</span> VTuberの一生 <span class="muted">ある人の、表現と暮らし</span></header>
+    <p id="error" class="notice" role="alert" hidden></p>
+    <noscript>このゲームを動かすにはJavaScriptを有効にしてください。</noscript>
+    <section id="title-screen" class="title-screen">
+      <p class="eyebrow">人生を、見届ける。</p>
+      <h1>ある人が、ある時代に、<br>表現を始めた。</h1>
+      <p>作品を作る日も、暮らしを大切にする日も。<br>週ごとの変化を眺めながら、一人の歩みをたどります。</p>
+      <button id="start" class="primary" disabled>生まれる（おまかせで始める）</button>
+      <p id="loading" role="status">人生の準備をしています…</p>
+      <p class="muted">入力は不要です。人物とVの設定は自動で決まります。</p>
+      <details class="seed-option"><summary>同じたねで始める</summary><label for="seed">たね（同じ版・同じたねで同じ人生）</label><input id="seed" type="text" maxlength="200" autocomplete="off" placeholder="空欄のままでも始められます"></details>
+    </section>
+    <section id="observation" hidden>
+      <header class="run-header">
+        <div><p id="status" class="eyebrow" role="status"></p><h1 id="observation-heading" tabindex="-1"><span id="name"></span>の歩み</h1><p id="profile"></p><p id="date" class="muted"></p></div>
+        <div class="controls"><button id="pause">一時停止</button><button id="resume" class="primary">最新へ戻って再開</button><label>速さ <select id="speed" aria-label="進行速度（倍）"></select> 倍</label></div>
+      </header>
+      <section id="result" class="notice" hidden><h2>ひとつの観察を終えて</h2><p id="result-text"></p><a href="/">別の人生を見届ける</a></section>
+      <section class="panel graph-panel" aria-labelledby="graph-heading">
+        <div class="panel-heading"><h2 id="graph-heading">週ごとの活動</h2><label>表示幅 <select id="window" aria-label="グラフの表示週数"></select></label></div>
+        <div class="legend" aria-label="系列の表示切替">
+          <button id="series-S" aria-pressed="true"><span class="key key-s" aria-hidden="true"></span>登録者 S［人］</button>
+          <button id="series-C" aria-pressed="true"><span class="key key-c" aria-hidden="true"></span>同接 C［人］</button>
+          <button id="series-G" aria-pressed="true"><span class="key key-g" aria-hidden="true"></span>新規登録 G［人/週］</button>
+        </div>
+        <div id="graph" class="graph"></div>
+        <div class="history-control"><label for="history">過去の週を読む（進行を停止）</label><input id="history" type="range" min="0" max="0" value="0" disabled><span id="following" class="muted"></span></div>
+        <p id="week-info" class="week-info" tabindex="-1"></p>
+        <p class="caption">同接は配信時間で加重した平均。配信なしの週は線を切ります。左軸と右軸は別の尺度です。</p>
+      </section>
+      <div class="two-column">
+        <section class="panel" aria-labelledby="radar-heading"><h2 id="radar-heading">能力の輪郭</h2><div id="radar" class="radar"></div><p class="caption">実線：現在 ／ 破線：デビュー時<br>ゲーム内の技術水準（0～100）。総合得点や成功確率ではありません。</p><details id="ability-detail" data-pause><summary>能力の数値を読む（進行を停止）</summary><table><thead><tr><th scope="col">能力</th><th scope="col">現在</th><th scope="col">デビュー時</th></tr></thead><tbody id="abilities"></tbody></table></details></section>
+        <section class="panel" aria-labelledby="life-heading"><h2 id="life-heading">いまの暮らし</h2><dl class="metrics"><div><dt>登録者</dt><dd id="subscribers"></dd></div><div><dt>公開した作品</dt><dd id="work-count"></dd></div><div><dt>生活資金</dt><dd id="funds"></dd></div><div><dt>うち確保済み制作費</dt><dd id="reserved"></dd></div><div><dt>生活費の不足累計</dt><dd id="unmet"></dd></div><div><dt>疲労</dt><dd id="fatigue"></dd></div></dl><p class="caption">金額・疲労はゲーム内の簡略モデルです。</p><p class="quiet-note">いまの活動を楽しんでいる<br><span class="muted">夢は決めずに始めています。</span></p><details id="seed-detail" data-pause><summary>この人生のたねを読む（進行を停止）</summary><p id="seed-used" class="seed-text"></p></details></section>
+      </div>
+      <section class="panel" aria-labelledby="logs-heading"><h2 id="logs-heading">積み重なる記録</h2><p class="caption">開いている間は進行を止めます。続きを見るには「最新へ戻って再開」を押してください。</p><div class="two-column"><details id="activity-detail" data-pause><summary>VTuberとしての出来事・作品</summary><ol id="activity-log" class="log"></ol></details><details id="life-detail" data-pause><summary>中の人の暮らし・月の収支</summary><ol id="life-log" class="log"></ol></details></div></section>
+    </section>
+    <footer>表示する人物・活動・記録はフィクションです。</footer>
+  </main>
+</body>
+</html>
