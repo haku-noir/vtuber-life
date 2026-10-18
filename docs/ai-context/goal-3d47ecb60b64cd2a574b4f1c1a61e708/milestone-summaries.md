@@ -40,3 +40,7 @@ M12 landed in 1 commit (fee52390e5) touching DECISIONS, params.js, sim.js, event
 ## M13 Dreams, epilogue, life record, alternate-era comparison
 
 M13 landed in 1 commit (59a97d096d) touching src/dreams.js, epilogue.js, compare.js, sim.js, events.js, test/dreams.test.mjs and DECISIONS. It added dreams, the epilogue, the life record, and the alternate-era comparison (same person, household and initial dream; different start year; reset state). Verification passed 2 times (npm test). Review passed with 5 findings and 0 blockers, including duplicated affiliation re-pick logic in compare.js and hardcoded epilogue strings; 0 fix rounds.
+
+## M19 Rework: Events and major choices, heavy events with support notice, marriage/...
+
+M19 (rework of M12) landed in 2 commits (c83f12105e, 9388543a75). It touched DECISIONS, web/app.js, index.html, style.css, src/lifeposition.js, web/lifeposition.js and test/lifeposition.test.mjs. It added the life-position supplementary screen: same-year in-game distribution (LP11), a few sourced context values, evidence badges, a permanent disclaimer and a failure-tolerant local loader. Verification passed 4 times. Review passed with 2 minor findings, 0 blockers and 1 fix round.
