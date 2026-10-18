@@ -2,14 +2,13 @@
 # Roadmap
 
 ```text
-Position: milestone 4 of 11 (M10 in progress)
-Current milestone: M10
+Position: 4 of 11 milestones done; the next one is being planned
+Current milestone: none
 Replans used: 0 of 6
 M1 [done] Base: seeded RNG, params loader, calendar boundaries, save data, serve script
 M2 [done] Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
 M9 [done] Weekly auto-advance: abilities, activities, money, WeeklySnapshot, run loop
-M10 [in progress] Data: P-18 distributions, name ledger, BG22 rule, connect person and household
-    files: docs/spec/params.json, docs/spec/params.md, src/person.js, src/setup.js, test/setup.test.mjs; accept: setup.ready is true for QS1 on all start years (AT01/AT02); Seed code round-trips through the edi...
+M10 [done] Data: P-18 distributions, name ledger, BG22 rule, connect person and household
 M17 [pending] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ... (rework)
     files: docs/spec/params.json, docs/spec/params.md, src/person.js, src/setup.js, test/setup.test.mjs; accept: Apply the user's answer to goal-3d47ecb60b64cd2a574b4f1c1a61e708-q12: yes
 M16 [pending] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ... (rework)
