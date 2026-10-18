@@ -7532,6 +7532,7 @@
      }
     ],
     "bg22": {
+     "basis": "P-18 BG22 / P-20: 子供必須、非同居15%は子と暮らすひとり親。婚姻を強制しない（仮置き）",
      "unionProbability": 0.85,
      "childrenRequired": true,
      "nonUnion": "single_parent",

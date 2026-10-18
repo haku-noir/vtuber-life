@@ -364,6 +364,17 @@ test("P-18 background eligibility and initial values are data-driven without ret
   assert.deepEqual(changed.naturalSpeech, original.naturalSpeech);
 });
 
+test("P-18 affiliation fails clearly when no row fits the year or experience", () => {
+  for (const constraint of [{ minYear: 2027 }, { minPracticeYears: 7 }]) {
+    const altered = copy(params);
+    altered.collections.initialWeights.generation.affiliations =
+      altered.collections.initialWeights.generation.affiliations.map(row => ({ ...row, ...constraint }));
+    assert.throws(() => generatePerson(altered, 42), {
+      name: "TypeError", message: "No eligible initial affiliation for start year and practice years",
+    });
+  }
+});
+
 test("AT136/AT138/AT139 BG22 always has children, including its single-parent branch", () => {
   let unions = 0, singleParents = 0;
   for (let seed = 0; seed < 10000; seed++) {
@@ -387,6 +398,39 @@ test("AT136/AT138/AT139 BG22 always has children, including its single-parent br
   const h = generateHousehold(altered, { personSeed: 1, age: 20, background: "BG22" }).household;
   assert.equal(h.maritalStatus, "single");
   assert.ok(h.children.every(child => child.relativeAge === 0));
+});
+
+test("AT136/AT138 BG22 single_parent preserves children without forcing marriage", () => {
+  const altered = copy(params), rule = altered.collections.initialWeights.generation.bg22;
+  assert.equal(rule.nonUnion, "single_parent");
+  assert.equal(rule.childrenRequired, true);
+  assert.equal(rule.unionProbability, 0.85);
+  assert.ok(rule.basis.includes("仮置き"));
+  for (const unionProbability of [0, 1]) {
+    rule.unionProbability = unionProbability;
+    for (const age of [20, 25, 45]) {
+      for (let personSeed = 0; personSeed < 20; personSeed++) {
+        const input = { personSeed, age, background: "BG22" };
+        const result = generateHousehold(altered, input), h = result.household;
+        assert.deepEqual(generateHousehold(altered, input), result);
+        assert.equal(result.provenance.basis, rule.basis);
+        assert.equal(result.provenance.playerOverride, false);
+        assert.ok(h.children.length >= 1 && h.children.length <= 3);
+        assert.ok(h.childcareHoursPerWeek > 0);
+        for (const child of h.children)
+          assert.ok(child.relativeAge >= 0 && child.relativeAge <= Math.min(age - 20, 17));
+        if (unionProbability === 0) {
+          assert.equal(h.maritalStatus, "single");
+          assert.equal(h.partner, null);
+          assert.equal(h.partnerShare, 0);
+        } else {
+          assert.ok(["married", "partnered"].includes(h.maritalStatus));
+          assert.ok(h.partner);
+          assert.ok(h.partnerShare > 0);
+        }
+      }
+    }
+  }
 });
 
 test("AT98/AT99 editor: every preset, locks, rerolls and next reroll survive seed-code import", () => {

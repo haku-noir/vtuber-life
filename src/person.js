@@ -108,8 +108,10 @@ export function generatePerson(params, personSeed) {
     return { kind: "practice", axis, startAge: age - years, endAge: age, hours };
   });
   const practiceYears = Math.max(...experience.map(row => row.endAge - row.startAge));
-  const initialAffiliation = pick(rng.fork("affiliation"), source.affiliations.filter(row =>
-    startYear >= row.minYear && practiceYears >= row.minPracticeYears)).value;
+  const affiliations = source.affiliations.filter(row =>
+    startYear >= row.minYear && practiceYears >= row.minPracticeYears);
+  if (!affiliations.length) throw new TypeError("No eligible initial affiliation for start year and practice years");
+  const initialAffiliation = pick(rng.fork("affiliation"), affiliations).value;
   const currentWork = { background, kind: backgroundRule.kind, lifeProfile: backgroundRule.lifeProfile };
   const employment = backgroundRule.kind === "employment" ? [{ background, startAge: age, endAge: null }] : [];
   const personTemplate = freeze({ personSeed, generationVersion: source.version, startDate, startYear,
@@ -215,5 +217,5 @@ export function generateHousehold(params, { personSeed, age, background }) {
   birthRole: "not_applicable", disclosure: "private" };
   return freeze({ household, provenance: { value: household, method: "stat_informed_weighted",
     evidenceClass: "推定／仮置き", referenceStatsIds: [...new Set([...r.sourceIds, "M32"])],
-    basis: background === "BG22" ? "P-18 BG22 / P-20: 非同居はひとり親" : "P-20", playerOverride: false } });
+    basis: background === "BG22" ? bg22.basis : "P-20", playerOverride: false } });
 }
