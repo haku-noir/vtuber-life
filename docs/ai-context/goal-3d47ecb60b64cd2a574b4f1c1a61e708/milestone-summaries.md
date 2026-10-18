@@ -20,3 +20,7 @@ M10 landed in 1 commit (f0857bc002) touching DECISIONS, params.json/md, person.j
 ## M17 Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ...
 
 M17 (rework of M10) landed in 1 commit (b476af05b3) touching DECISIONS, params.json/md, person.js and setup tests. BG22's 15% non-cohabiting case became a single parent living with children, with no forced marriage and a placeholder basis recorded in params. A dedicated TypeError now fires when no initial affiliation is eligible. Regression tests cover AT136/AT138. Verification passed 2 times; review passed with 1 minor finding, 0 blockers and 0 fix rounds.
+
+## M16 Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ...
+
+M16 (rework of M10) landed in 1 commit (c9abad2294) touching only docs/DECISIONS.md. It recorded decisions and notes for the P-18/name ledger/BG22 rework. Verification passed 2 times (npm test). Review passed with 1 finding, 0 blockers and 0 fix rounds.

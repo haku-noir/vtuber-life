@@ -2,8 +2,8 @@
 # Roadmap
 
 ```text
-Position: 6 of 11 milestones done; the next one is being planned
-Current milestone: none
+Position: milestone 7 of 11 (M11 in progress)
+Current milestone: M11
 Replans used: 0 of 6
 M1 [done] Base: seeded RNG, params loader, calendar boundaries, save data, serve script
 M2 [done] Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
@@ -11,7 +11,7 @@ M9 [done] Weekly auto-advance: abilities, activities, money, WeeklySnapshot, run
 M10 [done] Data: P-18 distributions, name ledger, BG22 rule, connect person and household
 M17 [done] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ... (rework)
 M16 [done] Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ... (rework)
-M11 [pending] Observation UI: weekly 3-series graph, radar, log, speed, pause
+M11 [in progress] Observation UI: weekly 3-series graph, radar, log, speed, pause
     files: web/index.html, web/app.js, web/graph.js, web/style.css; accept: AT05: UI actions do not change results; Graph shows the S/G/U series
 M12 [pending] Events and major choices, heavy events with support notice, marriage/family
     files: src/events.js, src/household.js, test/events.test.mjs; accept: AT04/AT06 when resuming a pending choice; EV93-96 tests; Heavy events are never removed or reduced
