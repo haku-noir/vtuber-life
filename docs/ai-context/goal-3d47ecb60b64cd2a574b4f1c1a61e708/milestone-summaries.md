@@ -44,3 +44,7 @@ M13 landed in 1 commit (59a97d096d) touching src/dreams.js, epilogue.js, compare
 ## M19 Rework: Events and major choices, heavy events with support notice, marriage/...
 
 M19 (rework of M12) landed in 2 commits (c83f12105e, 9388543a75). It touched DECISIONS, web/app.js, index.html, style.css, src/lifeposition.js, web/lifeposition.js and test/lifeposition.test.mjs. It added the life-position supplementary screen: same-year in-game distribution (LP11), a few sourced context values, evidence badges, a permanent disclaimer and a failure-tolerant local loader. Verification passed 4 times. Review passed with 2 minor findings, 0 blockers and 1 fix round.
+
+## M14 Life-position supplementary screen using only allowed sourced stats
+
+M14 landed in 1 commit (a7f31f24b0) touching web/lifeposition.js, test/lifeposition.test.mjs and DECISIONS. It finished the life-position screen: the stats version shows at the end of UI12/UI13, the internal value not-loaded shows as 未取得, and regression tests cover saved not-loaded versions. Verification passed 2 times (npm test). Review passed with 2 minor findings (a stale npm note in DECISIONS, and null/empty statsVersion shows blank), 0 blockers and 0 fix rounds.

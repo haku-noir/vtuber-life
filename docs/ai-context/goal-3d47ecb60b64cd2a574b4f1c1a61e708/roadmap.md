@@ -2,8 +2,8 @@
 # Roadmap
 
 ```text
-Position: 12 of 13 milestones done; the next one is being planned
-Current milestone: none
+Position: milestone 13 of 13 (M15 in progress)
+Current milestone: M15
 Replans used: 0 of 6
 M1 [done] Base: seeded RNG, params loader, calendar boundaries, save data, serve script
 M2 [done] Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
@@ -17,6 +17,6 @@ M12 [done] Events and major choices, heavy events with support notice, marriage/
 M13 [done] Dreams, epilogue, life record, alternate-era comparison
 M19 [done] Rework: Events and major choices, heavy events with support notice, marriage/... (rework)
 M14 [done] Life-position supplementary screen using only allowed sourced stats
-M15 [pending] Full AT test coverage and fixed-seed scenarios
+M15 [in progress] Full AT test coverage and fixed-seed scenarios
     files: test/at.test.mjs, docs/DECISIONS.md; accept: Every applicable AT has a named test; npm test passes
 ```
