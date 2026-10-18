@@ -400,6 +400,34 @@ test("AT136/AT138/AT139 BG22 always has children, including its single-parent br
   assert.ok(h.children.every(child => child.relativeAge === 0));
 });
 
+test("AT136/AT138/AT139 M18 q15 keeps both BG22 branches with shipped settings", () => {
+  const rule = params.collections.initialWeights.generation.bg22;
+  assert.equal(rule.unionProbability, 0.85);
+  assert.equal(rule.childrenRequired, true);
+  assert.equal(rule.nonUnion, "single_parent");
+  for (const age of [20, 25, 45]) {
+    // Fixed seeds exercise both branches without overriding the shipped probability.
+    for (const personSeed of [8, 9]) {
+      const result = generateHousehold(params, { personSeed, age, background: "BG22" });
+      const h = result.household;
+      assert.ok(h.children.length >= 1 && h.children.length <= 3);
+      assert.ok(h.childcareHoursPerWeek > 0);
+      assert.equal(result.provenance.basis, rule.basis);
+      for (const label of ["q15", "yes", "仮置き", "統計値ではない"])
+        assert.ok(result.provenance.basis.includes(label));
+      if (personSeed === 9) {
+        assert.equal(h.maritalStatus, "single");
+        assert.equal(h.partner, null);
+        assert.equal(h.partnerShare, 0);
+      } else {
+        assert.ok(["married", "partnered"].includes(h.maritalStatus));
+        assert.ok(h.partner);
+        assert.ok(h.partnerShare > 0);
+      }
+    }
+  }
+});
+
 test("AT136/AT138 BG22 single_parent preserves children without forcing marriage", () => {
   const altered = copy(params), rule = altered.collections.initialWeights.generation.bg22;
   assert.equal(rule.nonUnion, "single_parent");
