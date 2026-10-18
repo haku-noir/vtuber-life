@@ -126,6 +126,40 @@ test("AT97/AT133 partial: missing former title is reported without silently chan
   assert.equal(fixed.issues.some(row => row.field === "statusV"), false);
 });
 
+test("AT131 partial: species rerolls weight retained natural titles and exclude forbidden pairs", () => {
+  const preset = id => ({ preset: id, custom: null });
+  const levels = params.collections.compatibility.levels;
+  assert.equal(compatibilityWeight(params, "species", "SP03", {}), 1);
+  assert.equal(compatibilityWeight(params, "species", "SP03", { occupationV: preset("JB21") }), levels.自然);
+  assert.equal(compatibilityWeight(params, "species", "SP03", { occupationV: preset("JB21"), statusV: preset("ST01") }), levels.自然 ** 2);
+  assert.equal(compatibilityWeight(params, "species", "SP03", { statusV: preset("ST13") }), levels["ギャップとして許容"]);
+  assert.equal(compatibilityWeight(params, "species", "SP11", { occupationV: preset("JB11") }), levels["おまかせでは選ばない"]);
+  assert.equal(compatibilityWeight(params, "species", "SP03", { occupationV: { preset: null, custom: "自由入力" } }), 1);
+  const session = createSetup(params, { seed: "species-reroll", entry: "QS3" });
+  session.override("occupationV", preset("JB11"));
+  const before = session.snapshot();
+  for (let i = 0; i < 100; i++) {
+    const next = session.reroll("species");
+    assert.notEqual(next.runSetupTemplate.v.species.preset, "SP11");
+    assert.deepEqual(next.runSetupTemplate.v.occupationV, before.runSetupTemplate.v.occupationV);
+    assert.deepEqual(next.runSetupTemplate.v.statusV, before.runSetupTemplate.v.statusV);
+    assert.strictEqual(next.personTemplate, before.personTemplate);
+  }
+});
+
+test("AT95 partial: locks guard rerolls; explicit overrides stay editable and undoable", () => {
+  const session = createSetup(params, { seed: "locked-edit", entry: "QS3" });
+  const before = session.setLock("v_settings", true);
+  const changed = session.override("species", { preset: "SP03", custom: null });
+  assert.equal(changed.runSetupTemplate.v.species.preset, "SP03");
+  assert.deepEqual(changed.lockedGroups, before.lockedGroups);
+  assert.deepEqual(changed.fieldSeeds, before.fieldSeeds);
+  assert.strictEqual(changed.personTemplate, before.personTemplate);
+  assert.equal(changed.setupProvenance.v.species.playerOverride, true);
+  assert.deepEqual(session.reroll("species"), changed);
+  assert.deepEqual(session.undo(), before);
+});
+
 test("AT108 partial: custom text uses codepoint limits and removes controls and URLs", () => {
   const session = createSetup(params, { seed: 2, entry: "QS3" });
   const s = session.override("firstPerson", { custom: "わ\nたし\u202e https://example.invalid" });
@@ -169,6 +203,49 @@ test("AT98 codec: custom text never appears in decoded payload and carries an om
   assert.equal(Object.hasOwn(result.record.selections, "firstPerson"), false);
   assert.equal(JSON.stringify(result.record).includes("秘密"), false);
   assert.deepEqual(result.notices, ["自由入力の項目は共有されません"]);
+});
+
+test("AT98/AT99 codec: binary size, wire fixture, uint32 seeds and safe-integer generations", () => {
+  const minimal = { ...seedRecord(), worldSeed: 0, personSeed: 0, vSeed: 0, rerollCount: 0,
+    fieldGenerations: Object.fromEntries(SEED_FIELDS.map(field => [field, 0])), lockedGroups: [], overrides: {}, selections: {} };
+  assert.equal(encodeSeedCode(minimal), "VTL5-A4B9-8YJP-JHVS-Q56V-ZY39-B7P-A");
+  assert.equal(encodeSeedCode(minimal).length, 35);
+  assert.ok(encodeSeedCode(seedRecord()).length < 110);
+  for (const seed of [0, 1, 0x7fffffff, 0x80000000, 0xffffffff]) {
+    for (const count of [0, 127, 128, 16384, 0xffffffff, Number.MAX_SAFE_INTEGER]) {
+      const record = { ...minimal, worldSeed: seed, personSeed: 0xffffffff - seed, vSeed: seed,
+        rerollCount: count, fieldGenerations: Object.fromEntries(SEED_FIELDS.map((field, i) => [field, i % 2 ? count : 0])),
+        lockedGroups: ["v_appearance", "v_settings", "activity_policy"],
+        overrides: { personaStyle: { primary: "PT01", secondary: "PT24" }, statusV: { preset: "ST09", custom: null, formerTitle: "ST01" } },
+        selections: { firstPerson: { preset: "CS01_00", custom: null }, statusV: { preset: "ST01", custom: null, formerTitle: null } } };
+      const result = decodeSeedCode(encodeSeedCode(record));
+      assert.equal(result.ok, true);
+      assert.deepEqual(result.record, record);
+    }
+  }
+});
+
+test("AT99 codec: valid checksums cannot hide invalid binary structure or version bundles", () => {
+  const wire = bytes => {
+    const alphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+    let value = 1n, body = "", checksum = 0;
+    for (const byte of bytes) value = (value << 8n) | BigInt(byte);
+    while (value) { body = alphabet[Number(value % 31n)] + body; value /= 31n; }
+    for (const char of body) checksum = (checksum * 17 + alphabet.indexOf(char)) % 31;
+    return `VTL5-${body.match(/.{1,4}/gu).join("-")}-${alphabet[checksum]}`;
+  };
+  const seeds = Array(12).fill(0);
+  assert.equal(decodeSeedCode(wire([2, 0, ...seeds])).error, "別の版のたね");
+  for (const bytes of [
+    [1, 128, ...seeds], [1, 0, ...seeds, 0], [1, 0, ...seeds.slice(1)],
+    [1, 16, ...seeds, 128], // truncated integer
+    [1, 16, ...seeds, ...Array(8).fill(255), 1], // overflow
+    [1, 16, ...seeds, 129, 0, 0], // overlong encoding of 1
+    [1, 16, ...seeds, 1, 1, 2], // field generation exceeds total
+    [1, 32, ...seeds, 0], // redundant empty map
+    [1, 32, ...seeds, 128, 128, 64], // unknown field bit
+    [1, 32, ...seeds, 8, 101, 0], // invalid PT ID
+  ]) assert.equal(decodeSeedCode(wire(bytes)).ok, false);
 });
 
 test("AT139 household component: 100,000 fixed-age adults follow P-20 union probabilities", () => {

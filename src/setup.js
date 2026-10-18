@@ -33,8 +33,15 @@ export function compatibilityWeight(params, field, candidate, current) {
   const species = field === "species" ? candidate : current.species?.custom ? null : current.species?.preset;
   const row = c.speciesXStatusOccupation.find(row => ids(row["種族（SP）"]).includes(species));
   if (row) {
-    if (field === "species") return [current.occupationV, current.statusV].some(value =>
-      !value?.custom && ids(row["おまかせでは選ばない"]).includes(value?.preset)) ? 0 : weight;
+    if (field === "species") {
+      const titles = [current.occupationV, current.statusV].filter(value => value?.preset && !value.custom);
+      if (titles.some(value => ids(row["おまかせでは選ばない"]).includes(value.preset)))
+        return c.levels["おまかせでは選ばない"];
+      // Initial species sampling has no titles. A reroll uses each retained
+      // species/title relationship, just as downstream title sampling does.
+      return titles.reduce((product, value) => product *
+        (ids(row.自然).includes(value.preset) ? c.levels.自然 : c.levels["ギャップとして許容"]), 1);
+    }
     if (ids(row["おまかせでは選ばない"]).includes(candidate)) return c.levels["おまかせでは選ばない"];
     if (ids(row.自然).includes(candidate)) weight = c.levels.自然;
   }
@@ -137,7 +144,7 @@ function vProvenance(params, values, overrides) {
     const rule = targets[field] ? initialRule(params, targets[field]) : row ?
       { 区分: "仮置き", "重み・値": row.columns.プリセット } : { 区分: "仮置き", "重み・値": "生成データ未定義" };
     return [field, provenance(values[field], rule, Object.hasOwn(overrides, field) ? "player" : values[field] === null ? "unresolved" :
-      ["occupationV", "statusV", "firstPerson"].includes(field) ? "random_consistent" : ["personaStyle", "catchphrase"].includes(field) ? "default" : "uniform", Object.hasOwn(overrides, field))];
+      ["species", "occupationV", "statusV", "firstPerson"].includes(field) ? "random_consistent" : ["personaStyle", "catchphrase"].includes(field) ? "default" : "uniform", Object.hasOwn(overrides, field))];
   }));
 }
 
