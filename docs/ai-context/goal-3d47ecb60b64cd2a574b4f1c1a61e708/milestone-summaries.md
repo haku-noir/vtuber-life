@@ -16,3 +16,7 @@ M9 landed in 1 commit (e890942f84) touching sim.js, activity.js, economy.js, par
 ## M10 Data: P-18 distributions, name ledger, BG22 rule, connect person and household
 
 M10 landed in 1 commit (f0857bc002) touching DECISIONS, params.json/md, person.js, setup.js and setup tests. It added the P-18 distributions (age as a truncated normal: 18-45, mean 25, sd 6, from params), the name ledger and the BG22 rule (unmarried 15% become single parents), and connected person generation to the household. Verification passed 2 times; review passed with 4 minor findings, 0 blockers and 0 fix rounds.
+
+## M17 Rework: Data: P-18 distributions, name ledger, BG22 rule, connect person and ...
+
+M17 (rework of M10) landed in 1 commit (b476af05b3) touching DECISIONS, params.json/md, person.js and setup tests. BG22's 15% non-cohabiting case became a single parent living with children, with no forced marriage and a placeholder basis recorded in params. A dedicated TypeError now fires when no initial affiliation is eligible. Regression tests cover AT136/AT138. Verification passed 2 times; review passed with 1 minor finding, 0 blockers and 0 fix rounds.
