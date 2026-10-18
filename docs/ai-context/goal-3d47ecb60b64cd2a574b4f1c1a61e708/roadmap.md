@@ -2,12 +2,11 @@
 # Roadmap
 
 ```text
-Position: milestone 2 of 8 (M2 in progress)
-Current milestone: M2
+Position: 2 of 8 milestones done; the next one is being planned
+Current milestone: none
 Replans used: 0 of 6
 M1 [done] Base: seeded RNG, params loader, calendar boundaries, save data, serve script
-M2 [in progress] Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
-    files: src/setup.js, src/person.js, src/seedcode.js, test/setup.test.mjs; accept: AT01/AT02 and the 22.5 QS tests; Rerolling V never changes the person; a seed code restores the s...
+M2 [done] Quick start QS1-3, fixed person template, V setup reroll/lock, seed code
 M3 [pending] Weekly auto-advance: abilities, activities, money, WeeklySnapshot, run loop
     files: src/sim.js, src/activity.js, src/economy.js, test/sim.test.mjs; accept: AT03/AT07/AT09 checks pass; A video-only life and a streaming life both run to the end with no UI
 M4 [pending] Observation UI: weekly 3-series graph, radar, log, speed, pause
