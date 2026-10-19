@@ -18,12 +18,12 @@ function initial(seed = "family", role = "self") {
       partnerShare: 0.5, children: [], childcareHoursPerWeek: 0, birthRole: role, disclosure: "private" } },
     runSetupTemplate: { startDate: "2020-01-29", policy: { format: "video", liveMode: "off", voiceTraining: false } } };
 }
-function tune(mutator = () => {}) {
+function tune(mutator = () => {}, months = 36) {
   const p = structuredClone(params);
   // Isolate family/scheduling fixtures; shipped-weight integration is separate.
   for (const row of p.collections.events) if (RECURRENT_HEAVY_EVENT_IDS.includes(row.id)) row.weight.value = 0;
   const period = p.collections.provisionalValues.find(row => row.columns.項目 === "観察期間");
-  period.columns["暫定値・扱い"] = period.columns["暫定値・扱い"].replace(/から\d+暦月/u, "から36暦月");
+  period.columns["暫定値・扱い"] = period.columns["暫定値・扱い"].replace(/から\d+暦月/u, `から${months}暦月`);
   mutator(p);
   return validateParams(p);
 }
@@ -458,7 +458,8 @@ test("AT06/AT141: birth date and leave end split calendar progress; EV96 support
 });
 
 test("AT06/AT23/AT141: birth adds childcare costs when the next monthly account opens", () => {
-  const p = tune(p => { p.collections.events.find(e => e.id === "EV93").weight.value = 0; });
+  // Cover birth and the next full monthly account; long-run replay is tested separately.
+  const p = tune(p => { p.collections.events.find(e => e.id === "EV93").weight.value = 0; }, 3);
   for (const date of ["2020-01-30", "2020-02-01"]) {
     const input = initial();
     input.personTemplate.household = { maritalStatus: "single" };
@@ -480,7 +481,7 @@ test("AT04/AT06/AT135: every heavy rest schedules EV26, pauses once and resumes 
     const p = tune(p => {
       p.collections.simBalance.healthLeave.months = months;
       p.collections.events.find(e => e.id === "EV93").weight.value = 0;
-    });
+    }, 3); // Includes a full month of activity after even the two-month leave.
     const input = initial(); input.runSetupTemplate.startDate = "2020-01-31";
     const pending = requestEvent(p, createSimulation(p, input), id);
     const index = pending.pendingDecision.options.findIndex(o => /休む|休止/u.test(o.label));
