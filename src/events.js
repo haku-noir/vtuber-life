@@ -146,6 +146,8 @@ export function advanceEvents(params, run, { week = false, month = false } = {})
   }
   if (h.leave?.reason === "childcare" && h.leave.returnDate <= date &&
       !state.queue.some(row => row.eventId === "EV96")) state.queue.unshift({ eventId: "EV96", relationshipId: null });
+  // Only the queue needs checking: the entry guard skips pending decisions,
+  // and answering EV26 clears health leave before events can advance again.
   if (h.leave?.reason === "health" && h.leave.returnDate <= date &&
       !state.queue.some(row => row.eventId === "EV26")) state.queue.unshift({ eventId: "EV26", relationshipId: null });
   drainEventQueue(params, run);

@@ -488,14 +488,37 @@ test("AT04/AT06/AT135: every heavy rest schedules EV26, pauses once and resumes 
     assert.ok(index >= 0);
     const resting = choose(p, pending, index), returnDate = addMonths("2020-01-31", months);
     assert.deepEqual(resting.household.leave, { reason: "health", returnDate });
+    const dayBefore = addDays(returnDate, -1);
+    let before = resting;
+    while (before.calendar.currentDate < dayBefore) {
+      before = advanceToBoundary(p, before, [dayBefore]);
+      assert.equal(before.state, "RUNNING");
+      assert.equal(before.pendingDecision, null);
+      assert.deepEqual(before.household.leave, resting.household.leave);
+      assert.equal(before.events.filter(e => e.eventId === "EV26").length, 0);
+      assert.ok(!before.eventState.queue.some(e => e.eventId === "EV26"));
+    }
+    assert.equal(before.calendar.currentDate, dayBefore);
+    const due = advanceToBoundary(p, before);
+    assert.equal(due.calendar.currentDate, returnDate);
+    assert.equal(due.pendingDecision.eventId, "EV26");
     const returning = runToEnd(p, resting);
     assert.equal(returning.calendar.currentDate, returnDate);
     assert.equal(returning.pendingDecision.eventId, "EV26");
     assert.deepEqual(runToEnd(p, loadSimulation(p, serializeSimulation(p, resting)).run), returning);
     assert.equal(returning.works.length, 0);
     assert.deepEqual(returning.abilities, resting.abilities);
+    assert.deepEqual(returning.household.leave, resting.household.leave);
+    assert.equal(returning.events.filter(e => e.eventId === "EV26").length, 1);
+    assert.ok(!returning.eventState.queue.some(e => e.eventId === "EV26"));
     assert.strictEqual(advanceToBoundary(p, returning), returning);
     const restored = loadSimulation(p, serializeSimulation(p, returning)).run;
+    const unanswered = structuredClone(restored);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      advanceEvents(p, restored, { week: true, month: true });
+      assert.strictEqual(runToEnd(p, restored), restored);
+      assert.deepEqual(restored, unanswered);
+    }
     for (const option of [0, 1]) {
       const resumed = choose(p, restored, option);
       assert.equal(resumed.household.leave, null);
@@ -509,6 +532,32 @@ test("AT04/AT06/AT135: every heavy rest schedules EV26, pauses once and resumes 
       assert.deepEqual(end.personTemplate, input.personTemplate);
     }
   }
+});
+
+test("AT04/AT06: an already queued health return is offered once and waits for an explicit answer", () => {
+  const p = tune();
+  const pending = requestEvent(p, createSimulation(p, initial()), "EV88");
+  const index = pending.pendingDecision.options.findIndex(o => /休む|休止/u.test(o.label));
+  assert.ok(index >= 0);
+  const run = choose(p, pending, index);
+  run.calendar.currentDate = run.household.leave.returnDate;
+  const leave = structuredClone(run.household.leave);
+  run.eventState.queue.push({ eventId: "EV26", relationshipId: null });
+  advanceEvents(p, run);
+  assert.equal(run.pendingDecision.eventId, "EV26");
+  assert.equal(run.state, "CHOICE");
+  assert.deepEqual(run.household.leave, leave);
+  assert.deepEqual(run.eventState.queue, []);
+  assert.equal(run.events.filter(e => e.eventId === "EV26").length, 1);
+  const unanswered = structuredClone(run);
+  advanceEvents(p, run);
+  assert.deepEqual(run, unanswered);
+  resolveEventChoice(p, run, run.pendingDecision.id, run.pendingDecision.options[0].id);
+  advanceEvents(p, run);
+  assert.equal(run.household.leave, null);
+  assert.equal(run.pendingDecision, null);
+  assert.deepEqual(run.eventState.queue, []);
+  assert.equal(run.events.filter(e => e.eventId === "EV26").length, 1);
 });
 
 test("AT06/AT141: health rest preserves childcare return and legacy undated leave gains a stable return date", () => {
