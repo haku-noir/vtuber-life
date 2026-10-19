@@ -21,3 +21,23 @@
 - マイルストーンは分けすぎず、テストの修正をイベント変更と同じマイルストーンに入れて、検証が通る状態でコミットする。
 
 【共通】既存の仕様の振る舞いを壊さない。npm test が全件通ること。pushしない。
+
+## Final goal (immutable, version 1)
+
+Purpose: Set one cycle to about 60 min at 1x and apply the provisional frequencies, intervals and childcare cost for EV14/25/86-88, keeping all existing behavior and passing npm test
+
+Acceptance:
+- 180 months x about 20 s ≈ 60 min at 1x; speeds 0.5/1/2/4; value read from params
+- EV14 1%, EV25 1%, EV86 1.5%, EV87 0.5%, EV88 1.5% per month; recurrence intervals 12/12/12/24/6 months; heavy events occur naturally
+- Childcare cost of 30,000 yen per child per month is added to fixed expenses
+- params.md and DECISIONS.md state these are provisional values, not statistics
+- npm test passes in full; no push
+
+Constraints:
+- Plain ES Modules, no external dependencies; deterministic seeded RNG only
+- Values are read from params.json, not hard-coded
+- Only a one-line edit to spec-main.md
+- The reference branch ai/goal-d48e73bede562a379c3656592476a214 is read-only (cherry-picking from it is allowed)
+- Each milestone commits only when its tests pass
+
+No role can change the final goal; a change needs an answered user question.
