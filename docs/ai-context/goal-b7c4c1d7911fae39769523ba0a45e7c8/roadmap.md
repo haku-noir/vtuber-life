@@ -2,7 +2,7 @@
 # Roadmap
 
 ```text
-Position: milestone 4 of 4 (M3 in progress)
+Position: milestone 4 of 5 (M3 in progress)
 Current milestone: M3
 Replans used: 0 of 6
 M1 [done] M1 Cycle about 60 min (20 s/month) and decoupling the clock test from the lot…
@@ -10,4 +10,6 @@ M2 [done] M2 Natural occurrence and intervals for heavy events EV14/25/86-88, wi
 M4 [done] Rework: M1 Cycle about 60 min (20 s/month) and decoupling the clock test from... (rework)
 M3 [in progress] M3 Childcare cost of 30,000 yen per child per month and the provisional-value…
     files: docs/spec/params.json, docs/spec/params.md, docs/DECISIONS.md, src/household.js, src/economy.js, ...; accept: Fixed expenses increase by 30,000 yen x number of children, read from params; params.md and DECIS...
+M5 [pending] Rework: M2 Natural occurrence and intervals for heavy events EV14/25/86-88, w... (rework)
+    files: docs/spec/params.json, src/params.js, src/events.js, src/sim.js, test/events.test.mjs, test/sim.t...; accept: Apply the user's answer to goal-b7c4c1d7911fae39769523ba0a45e7c8-q4: Approved: offer EV26 after 1...
 ```
