@@ -8,3 +8,7 @@ M1 (commit e01a0820e7) changed docs/spec/params.json, params.md, DECISIONS.md an
 ## M2 M2 Natural occurrence and intervals for heavy events EV14/25/86-88, with test…
 
 M1 (e01a0820e7): auto-advance changed to about 20 s per month in params.json, params.md and DECISIONS.md, so 180 months is about 60 min at 1x (speeds 0.5/1/2/4). The ui clock test now runs with all event weights at 0. spec-main.md is still pending. M2 (53361be9a5): EV14/25/86-88 now occur naturally with their provisional rates and intervals, via params.json, events.js and params.js, and the at/events/setup/sim tests were updated. Both passed verification (npm test) and review.
+
+## M4 Rework: M1 Cycle about 60 min (20 s/month) and decoupling the clock test from...
+
+M4 (commit 71e93aad1a) reworked M1 in docs/DECISIONS.md, docs/spec/params.json and docs/spec/params.md, keeping auto-advance at about 20 s per month (180 months is about 60 min at 1x) and read from params. Verification passed (npm test) and the review passed with 3 non-blocking findings: spec-main.md line 242 is still not updated (path rejected as too large), DECISIONS.md line 8 is out of date, and DECISIONS.md line 47 still says 5-10 min.
