@@ -24,3 +24,19 @@ M2: Create docs/ACCEPTANCE_REVIEW.md in Japanese as a user-review draft, request
 Prior recorded evidence, not new runs: goal-b7c4c1d7911fae39769523ba0a45e7c8 s24 npm PASS exit0, 130/130, 0fail, 101525ms; s25 review and s26 integrate SUCCEEDED, integrated commit 21bcaf0e0d081afbd0c9996b919a2765f6faf54f on 2026-10-19 JST. Also read the subsequent documented follow-up findings. Controller runs normal npm verification for this goal; report it separately.
 
 Write scope only docs/spec/spec-main.md (M1 exact line) and new docs/ACCEPTANCE_REVIEW.md (M2). Do not implement a future protected execution framework or any game/UI fix. No dependencies, API keys, extra charges, provider switching, Cursor, push/remotes/publication, auth/executable changes. Keep existing auto_extend and ceilings; no further policy/limit changes. Report actual tests, draft path, examples and unresolved issues, not blanket completion.
+
+## Final goal (immutable, version 1)
+
+Purpose: Fix the spec 2.2 playtime/speed line to match params, and add a Japanese user-review acceptance draft (未承認) separate from unit tests
+
+Acceptance:
+- spec-main.md matches expected 298809 bytes and SHA256; only line 242 changed
+- docs/ACCEPTANCE_REVIEW.md exists and covers the required sections, labeled 未承認
+- No runtime/test/params/settings changes; controller npm test reported separately
+
+Constraints:
+- Write scope: spec-main.md line 242 and new docs/ACCEPTANCE_REVIEW.md only
+- No dependencies, remotes, publication, or policy/limit changes beyond the stated cap
+- Never mark unperformed checks as passed; unknown evidence stays unknown
+
+No role can change the final goal; a change needs an answered user question.
