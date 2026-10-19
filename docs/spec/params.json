@@ -22,7 +22,8 @@
    "lesson": { "monthlyCostYen": 8000, "monthlyHours": 4 },
    "audience": { "uniqueReachRatio": 0.55, "overlapRatio": 0.35, "subscribeRate": 0.025, "dailyChurnRate": 0.0003, "regularRetention": 0.995, "regularConversion": 0.02, "attendanceMin": 0.1, "attendanceMax": 0.7, "walkInMax": 8, "commentRate": 0.008 },
    "discovery": { "dailyReach": 55, "qualityFloor": 0.4, "decayDays": 28, "tailRatio": 0.025, "rediscoveryAfterDays": 21, "rediscoveryDailyChance": 0.0004, "rediscoveryMultiplier": 25, "variationMin": 0.1, "variationMax": 2 },
-   "money": { "adYenPerView": 0.15, "supportYenPerViewerHour": 1.5, "receiptShare": 0.8 },
+   "money": { "adYenPerView": 0.15, "supportYenPerViewerHour": 1.5, "receiptShare": 0.8, "childcareMonthlyYen": 30000 },
+   "healthLeave": { "months": 1 },
    "formats": {
     "video": { "productionHours": 24, "productionCostYen": 1000, "productionShare": 0.85, "streamShare": 0, "practiceShare": 0.15, "streamSessionHours": 3, "streamPreparationHours": 1, "reachMultiplier": 1, "abilityWeights": { "singing": 0, "drawing": 0.1, "dance": 0, "gaming": 0.1, "talk": 0.1, "collaboration": 0, "planning": 0.3, "editing": 0.4 } },
     "shorts": { "productionHours": 8, "productionCostYen": 200, "productionShare": 0.9, "streamShare": 0, "practiceShare": 0.1, "streamSessionHours": 3, "streamPreparationHours": 1, "reachMultiplier": 2, "abilityWeights": { "singing": 0, "drawing": 0.1, "dance": 0.1, "gaming": 0.1, "talk": 0.2, "collaboration": 0, "planning": 0.2, "editing": 0.3 } },

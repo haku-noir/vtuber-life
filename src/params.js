@@ -231,7 +231,10 @@ export function getSimBalance(params) {
     "rediscoveryMultiplier", "variationMin", "variationMax"]);
   if (b.discovery.decayDays <= 0 || b.discovery.qualityFloor > 1 || b.discovery.tailRatio > 1 ||
       b.discovery.rediscoveryDailyChance > 1 || b.discovery.variationMin > b.discovery.variationMax) fail("discovery range");
-  numbers(b.money, ["adYenPerView", "supportYenPerViewerHour", "receiptShare"]);
+  numbers(b.money, ["adYenPerView", "supportYenPerViewerHour", "receiptShare", "childcareMonthlyYen"]);
+  if (!Number.isSafeInteger(b.money.childcareMonthlyYen)) fail("childcare cost");
+  numbers(b.healthLeave, ["months"], 1200);
+  if (!Number.isSafeInteger(b.healthLeave.months) || b.healthLeave.months < 1) fail("health leave duration");
   if (b.money.receiptShare > 1) fail("receipt share");
   const formats = ["video", "shorts", "music", "stream"];
   if (!isObject(b.formats) || Object.keys(b.formats).length !== formats.length) fail("activity formats");

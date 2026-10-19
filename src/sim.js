@@ -198,7 +198,9 @@ function advanceDraft(params, run, balance, eventDates) {
   for (let date = run.calendar.currentDate; date < step.calendar.currentDate; date = addDays(date, 1)) {
     const template = run.personTemplate, h = run.household;
     const baseCare = template.household?.childcareHoursPerWeek ?? 0;
-    const life = { ...template.life, careHoursPerWeek: Math.max(0, template.life.careHoursPerWeek - baseCare + h.childcareHoursPerWeek) };
+    const life = { ...template.life,
+      livingCostYen: template.life.livingCostYen + h.children.length * balance.money.childcareMonthlyYen,
+      careHoursPerWeek: Math.max(0, template.life.careHoursPerWeek - baseCare + h.childcareHoursPerWeek) };
     const available = dailyAvailableHours(life, balance);
     const scale = h.leave ? 0 : h.activityScale;
     life.careHoursPerWeek += available * 7 * (1 - scale);

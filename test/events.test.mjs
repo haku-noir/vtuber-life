@@ -179,7 +179,7 @@ test("AT135: every heavy ID respects its recurrence boundary, month-end clipping
     });
     const input = initial(); input.runSetupTemplate.startDate = "2020-01-31";
     const pending = requestEvent(p, createSimulation(p, input), id);
-    const answered = choose(p, pending, 0);
+    const answered = choose(p, pending, 1); // A non-rest response isolates recurrence from EV26.
     assert.throws(() => requestEvent(p, answered, id), /ineligible/);
     const other = RECURRENT_HEAVY_EVENT_IDS.find(other => other !== id);
     assert.equal(requestEvent(p, answered, other).pendingDecision.eventId, other);
@@ -302,11 +302,12 @@ test("AT116/AT135: shipped monthly chances naturally produce every heavy event w
       run.calendar.currentDate = addMonths("2020-01-01", month);
       advanceEvents(params, run, { month: true });
       while (run.pendingDecision) {
-        assert.deepEqual(run.pendingDecision.supportCard, SUPPORT_CARD);
+        if (HEAVY_EVENT_IDS.includes(run.pendingDecision.eventId))
+          assert.deepEqual(run.pendingDecision.supportCard, SUPPORT_CARD);
         resolveEventChoice(params, run, run.pendingDecision.id, run.pendingDecision.options[0].id);
       }
     }
-    return run.events.filter(row => row.kind === "catalog");
+    return run.events.filter(row => row.kind === "catalog" && RECURRENT_HEAVY_EVENT_IDS.includes(row.eventId));
   }
   for (let seed = 0; seed < 12; seed++) {
     const records = play(seed, {});
@@ -454,6 +455,77 @@ test("AT06/AT141: birth date and leave end split calendar progress; EV96 support
   const graduating = choose(p, returning, 3);
   assert.equal(graduating.pendingDecision.eventId, "EV27");
   assert.equal(choose(p, graduating, 1).state, "EPILOGUE");
+});
+
+test("AT06/AT23/AT141: birth adds childcare costs when the next monthly account opens", () => {
+  const p = tune(p => { p.collections.events.find(e => e.id === "EV93").weight.value = 0; });
+  for (const date of ["2020-01-30", "2020-02-01"]) {
+    const input = initial();
+    input.personTemplate.household = { maritalStatus: "single" };
+    let run = createSimulation(p, input);
+    run.household.pendingBirth = { date, optionId: "option-1", leaveMonths: 0, reduction: 20 };
+    while (run.calendar.currentDate < date) run = advanceToBoundary(p, run);
+    assert.equal(run.household.children.length, 1);
+    const saved = serializeSimulation(p, run), expected = runToEnd(p, run);
+    assert.deepEqual(runToEnd(p, loadSimulation(p, saved).run), expected);
+    assert.equal(expected.economy.summaries[0].livingDueYen, Math.floor(100000 * (3 / 31)));
+    assert.equal(expected.economy.summaries[1].livingDueYen, 130000);
+    assert.deepEqual(expected.personTemplate, input.personTemplate);
+  }
+});
+
+test("AT04/AT06/AT135: every heavy rest schedules EV26, pauses once and resumes activity after save/reload", () => {
+  assert.equal(params.collections.simBalance.healthLeave.months, 1);
+  for (const months of [1, 2]) for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+    const p = tune(p => {
+      p.collections.simBalance.healthLeave.months = months;
+      p.collections.events.find(e => e.id === "EV93").weight.value = 0;
+    });
+    const input = initial(); input.runSetupTemplate.startDate = "2020-01-31";
+    const pending = requestEvent(p, createSimulation(p, input), id);
+    const index = pending.pendingDecision.options.findIndex(o => /休む|休止/u.test(o.label));
+    assert.ok(index >= 0);
+    const resting = choose(p, pending, index), returnDate = addMonths("2020-01-31", months);
+    assert.deepEqual(resting.household.leave, { reason: "health", returnDate });
+    const returning = runToEnd(p, resting);
+    assert.equal(returning.calendar.currentDate, returnDate);
+    assert.equal(returning.pendingDecision.eventId, "EV26");
+    assert.deepEqual(runToEnd(p, loadSimulation(p, serializeSimulation(p, resting)).run), returning);
+    assert.equal(returning.works.length, 0);
+    assert.deepEqual(returning.abilities, resting.abilities);
+    assert.strictEqual(advanceToBoundary(p, returning), returning);
+    const restored = loadSimulation(p, serializeSimulation(p, returning)).run;
+    for (const option of [0, 1]) {
+      const resumed = choose(p, restored, option);
+      assert.equal(resumed.household.leave, null);
+      assert.ok(resumed.household.activityScale > 0);
+      assert.equal(resumed.household.activityScale, option ? 1 - getFamilyEventRules(p).ev96.reduction[0] / 100 : 1);
+      assert.strictEqual(answerDecision(p, resumed, restored.pendingDecision.id, restored.pendingDecision.options[option].id), resumed);
+      const end = runToEnd(p, resumed);
+      assert.equal(end.state, "RESULT");
+      assert.ok(end.works.some(work => work.releaseDate >= returnDate));
+      assert.equal(end.events.filter(e => e.eventId === "EV26").length, 1);
+      assert.deepEqual(end.personTemplate, input.personTemplate);
+    }
+  }
+});
+
+test("AT06/AT141: health rest preserves childcare return and legacy undated leave gains a stable return date", () => {
+  const p = tune(p => { p.collections.events.find(e => e.id === "EV93").weight.value = 0; });
+  const base = createSimulation(p, initial());
+  base.household.leave = { reason: "childcare", returnDate: "2020-02-29" };
+  const resting = choose(p, requestEvent(p, base, "EV88"), 0);
+  assert.deepEqual(resting.household.leave, base.household.leave);
+  assert.equal(runToEnd(p, resting).pendingDecision.eventId, "EV96");
+  const legacy = createSimulation(p, initial());
+  legacy.household.leave = { reason: "health", returnDate: null };
+  const loaded = loadSimulation(p, serializeSimulation(p, legacy));
+  assert.ok(loaded.ok);
+  const advanced = advanceToBoundary(p, loaded.run);
+  assert.equal(advanced.household.leave.returnDate, addMonths(advanced.calendar.currentDate, p.collections.simBalance.healthLeave.months));
+  const returning = runToEnd(p, advanced);
+  assert.equal(returning.pendingDecision.eventId, "EV26");
+  assert.equal(returning.calendar.currentDate, advanced.household.leave.returnDate);
 });
 
 test("AT15: corrupted choices, effect IDs, household values and malformed P-21 data are rejected", () => {

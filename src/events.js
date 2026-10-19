@@ -1,6 +1,6 @@
 import { createRng } from "./rng.js";
 import { finishActivity } from "./epilogue.js";
-import { getCandidates, getFamilyEventRules, getHeavyEventRules, RECURRENT_HEAVY_EVENT_IDS } from "./params.js";
+import { getCandidates, getFamilyEventRules, getHeavyEventRules, getSimBalance, RECURRENT_HEAVY_EVENT_IDS } from "./params.js";
 import { addMonths } from "./calendar.js";
 import { advanceFamilyDates, advanceRelationshipWeek, applyFamilyChoice, birthRoleWording,
   familyEligible, recordHousehold } from "./household.js";
@@ -101,6 +101,10 @@ export function advanceEvents(params, run, { week = false, month = false } = {})
   if (run.pendingDecision || run.state !== "RUNNING") return;
   advanceFamilyDates(params, run);
   const h = run.household, state = run.eventState, date = run.calendar.currentDate;
+  // Older saves can contain an undated health leave. Start its configured
+  // waiting period at the first processed boundary without rewriting history.
+  if (h.leave?.reason === "health" && h.leave.returnDate === null)
+    h.leave.returnDate = addMonths(date, getSimBalance(params).healthLeave.months);
   if (week && state.lastWeek < run.calendar.weekIndex - 1) {
     const index = run.calendar.weekIndex - 1;
     const response = h.weeklyResponse;
@@ -142,6 +146,8 @@ export function advanceEvents(params, run, { week = false, month = false } = {})
   }
   if (h.leave?.reason === "childcare" && h.leave.returnDate <= date &&
       !state.queue.some(row => row.eventId === "EV96")) state.queue.unshift({ eventId: "EV96", relationshipId: null });
+  if (h.leave?.reason === "health" && h.leave.returnDate <= date &&
+      !state.queue.some(row => row.eventId === "EV26")) state.queue.unshift({ eventId: "EV26", relationshipId: null });
   drainEventQueue(params, run);
 }
 
@@ -165,7 +171,9 @@ export function resolveEventChoice(params, run, decisionId, optionId) {
     if (index === 1) finishActivity(params, run);
   } else if (HEAVY_EVENT_IDS.includes(pending.eventId)) {
     const label = pending.options[index].label;
-    if (/休む|休止/u.test(label)) run.household.leave = { reason: "health", returnDate: null };
+    if (/休む|休止/u.test(label) && run.household.leave?.reason !== "childcare")
+      run.household.leave = { reason: "health",
+        returnDate: addMonths(run.calendar.currentDate, getSimBalance(params).healthLeave.months) };
     if (/予定を減らす/u.test(label)) run.household.activityScale = 1 - getFamilyEventRules(params).ev96.reduction[0] / 100;
   }
   run.choiceHistory.push({ decisionId, optionId, date: pending.date, eventId: pending.eventId });

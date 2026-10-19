@@ -128,6 +128,51 @@ test("AT06/AT23: leap month and partial edge months are charged once with intege
   }
 });
 
+test("AT06/AT23: childcare costs scale with children and params, prorate and survive save/reload", () => {
+  assert.equal(params.collections.simBalance.money.childcareMonthlyYen, 30000);
+  for (const cost of [30000, 12345, 0]) for (const count of [0, 1, 2]) {
+    const p = configured(2, b => { b.money.childcareMonthlyYen = cost; });
+    const input = initial();
+    input.personTemplate.household.children = Array.from({ length: count }, (_, i) => ({ id: `child-${i + 1}`, relativeAge: i }));
+    const original = structuredClone(input), start = createSimulation(p, input);
+    const end = runToEnd(p, start), due = 100000 + count * cost;
+    assert.deepEqual(end.economy.summaries.map(m => m.livingDueYen),
+      [Math.floor(due * (3 / 31)), due, Math.floor(due * (28 / 31))]);
+    for (const month of end.economy.summaries) {
+      assert.equal(month.livingDueYen, month.livingPaidYen + month.unmetLivingYen);
+      assert.equal(end.ledger.entries.filter(e => e.yearMonth === month.yearMonth && e.transactionId === "living").length, 1);
+    }
+    const partial = advanceToBoundary(p, start, ["2020-01-30"]);
+    assert.deepEqual(runToEnd(p, loadSimulation(p, serializeSimulation(p, partial)).run), runToEnd(p, partial));
+    assert.deepEqual(end.personTemplate, original.personTemplate);
+    assert.deepEqual(input, original);
+  }
+});
+
+test("AT09/AT23: childcare is fixed spending before optional lessons and never creates debt", () => {
+  const p = configured(1), input = initial("video", "2020-02-01");
+  Object.assign(input.personTemplate.life, { monthlyIncomeYen: 110000, openingBalanceYen: 0 });
+  const without = runToEnd(p, createSimulation(p, input));
+  assert.ok(without.economy.summaries[0].lessonCostYen > 0);
+  input.personTemplate.household.children = [{ id: "child-1", relativeAge: 1 }];
+  const end = runToEnd(p, createSimulation(p, input)), month = end.economy.summaries[0];
+  assert.equal(month.livingDueYen, 130000);
+  assert.equal(month.livingPaidYen, 110000);
+  assert.equal(month.unmetLivingYen, 20000);
+  assert.equal(month.lessonCostYen, 0);
+  assert.equal(month.productionCostYen, 0);
+  assert.equal(end.ledger.balanceYen, 0);
+  assert.equal(end.economy.unmetLivingYen, 20000);
+  assert.equal(end.channels[0].status, "active");
+});
+
+test("AT15: childcare money and health leave tuning reject invalid or missing values", () => {
+  for (const value of [undefined, null, -1, 0.5, "30000", NaN, Infinity, Number.MAX_SAFE_INTEGER])
+    assert.throws(() => configured(1, b => { b.money.childcareMonthlyYen = value; }));
+  for (const value of [undefined, null, -1, 0, 0.5, "1", NaN, Infinity, 1201])
+    assert.throws(() => configured(1, b => { b.healthLeave.months = value; }));
+});
+
 test("AT07/AT14: weekly audience conservation, gross acquisition attribution and weighted concurrency", () => {
   const p = configured(4), end = runToEnd(p, createSimulation(p, initial("stream")));
   let S = 0, G = 0;
