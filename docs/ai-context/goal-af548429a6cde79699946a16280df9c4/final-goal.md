@@ -14,3 +14,18 @@ Follow-up on vtuber-life main 21bcaf0e0d081afbd0c9996b919a2765f6faf54f. Use exis
 Known blocked requirement: docs/spec/spec-main.md is 298811 bytes > current project max_file_bytes 262144. Its line 242 still says 5-10 min / 1.5 sec per month although params use 60 min / 20 sec. Do NOT put this file in the write contract, attempt its edit, split/rewrite it to evade the limit, or retry the known rejection. Report unresolved; formal project policy change is required (minimum to admit the existing file: 298811 bytes; current cap increase of 36667 bytes), subject to separate approval. Do not change policy, executables, auth, API settings or limits.
 
 Write only docs/DECISIONS.md and docs/FOLLOWUP_REVIEW.md. Keep files in Japanese and each plan milestone at most 8 file entries. Final result must distinguish actual browser evidence, automated tests, unresolved owner decisions and the blocked spec line, even if controller state is DONE. No push/remotes/publishing, API keys, extra charges, provider switching, or direct source edits outside ai-ctl. Existing auto_extend and hard ceilings remain unchanged; quota/auth failures stop for the user.
+
+## Final goal (immutable, version 1)
+
+Purpose: Docs/audit only: fix stale verification records, record the quick-start-to-epilogue audit, and organize owner questions on unresolved choices
+
+Acceptance:
+- DECISIONS M3 section separates recorded verification results from implementation-time history
+- FOLLOWUP_REVIEW.md separates real-browser evidence (or NOT PERFORMED), automated tests, unresolved owner decisions and the blocked spec line
+- Changes only docs/DECISIONS.md and docs/FOLLOWUP_REVIEW.md; npm test PASS
+
+Constraints:
+- No runtime/test/spec-main.md changes; no dependency installs or policy/limit changes
+- Japanese; no push/publishing; do not invent decisions or statistics; at most 8 files per milestone
+
+No role can change the final goal; a change needs an answered user question.
