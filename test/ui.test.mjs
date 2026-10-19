@@ -2,15 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { once } from "node:events";
-import { loadParams, ABILITY_AXES } from "../src/params.js";
+import { loadParams, validateParams, ABILITY_AXES } from "../src/params.js";
 import { createSetup } from "../src/setup.js";
-import { createSimulation, advanceToBoundary, runToEnd, serializeSimulation, validateSimulation } from "../src/sim.js";
+import { createSimulation, advanceToBoundary, runToEnd, answerDecision, requestEvent, serializeSimulation, validateSimulation } from "../src/sim.js";
 import { createStaticServer } from "../scripts/serve.mjs";
 import { observationSettings, observedWeeks, weeklyGraph, renderWeeklyGraph, radarModel, renderRadar, weekDescription } from "../web/graph.js";
 import { createObservationController } from "../web/app.js";
 
 const params = await loadParams(url => readFile(url, "utf8"));
-const fresh = () => createSimulation(params, createSetup(params, { seed: "m11-observation" }).snapshot());
+const fresh = (p = params) => createSimulation(p, createSetup(p, { seed: "m11-observation" }).snapshot());
+// Timer assertions must not depend on the event lottery, including family events.
+const clockParams = structuredClone(params);
+for (const event of clockParams.collections.events) event.weight.value = 0;
+validateParams(clockParams);
+const answerFirst = run => answerDecision(params, run, run.pendingDecision.id, run.pendingDecision.options[0].id);
 function fakeClock() {
   let id = 0;
   const jobs = new Map(), delays = [];
@@ -23,16 +28,16 @@ function fakeClock() {
     tick() { const [key, callback] = jobs.entries().next().value ?? []; assert.ok(callback, "clock must be armed"); jobs.delete(key); callback(); },
   };
 }
-function observed(initialRun = fresh()) {
+function observed(initialRun = fresh(), p = params) {
   const clock = fakeClock();
-  const controller = createObservationController(params, { initialRun, schedule: clock.schedule, cancel: clock.cancel,
+  const controller = createObservationController(p, { initialRun, schedule: clock.schedule, cancel: clock.cancel,
     onError: error => { throw error; } });
   controller.start();
   return { clock, controller };
 }
 
 test("P-17 observation settings are read from data and reject unrecognized prose", () => {
-  assert.deepEqual(observationSettings(params), { monthMs: 1500, speeds: [0.5, 1, 2, 4], defaultWeeks: 52, windows: [13, 26, 52, 104, "all"] });
+  assert.deepEqual(observationSettings(params), { monthMs: 20000, speeds: [0.5, 1, 2, 4], defaultWeeks: 52, windows: [13, 26, 52, 104, "all"] });
   const altered = structuredClone(params);
   altered.collections.provisionalValues.find(row => row.columns.項目 === "自動送り").columns["暫定値・扱い"] = "平均約3秒／月相当、0.5・1・2・4倍";
   assert.equal(observationSettings(altered).monthMs, 3000);
@@ -41,12 +46,13 @@ test("P-17 observation settings are read from data and reject unrecognized prose
 });
 
 test("AT02/AT05: one-tap QS1 clock reaches the same RESULT despite speed, pause, graph and radar operations", () => {
-  const initial = fresh(), expected = runToEnd(params, initial);
+  const params = clockParams;
+  const initial = fresh(params), expected = runToEnd(params, initial);
   const clock = fakeClock();
   const controller = createObservationController(params, { seed: "m11-observation", schedule: clock.schedule, cancel: clock.cancel,
     onError: error => { throw error; } });
   controller.start();
-  let steps = 0;
+  let steps = 0, elapsedAt1x = 0;
   while (controller.snapshot().run.state !== "RESULT") {
     const { run } = controller.snapshot();
     if (steps % 37 === 0) {
@@ -65,17 +71,60 @@ test("AT02/AT05: one-tap QS1 clock reaches the same RESULT despite speed, pause,
       assert.equal(serializeSimulation(params, controller.snapshot().run), before);
     }
     assert.equal(clock.size, 1, "only one boundary is scheduled");
+    elapsedAt1x += clock.lastDelay * controller.snapshot().view.speed;
     clock.tick();
     assert.ok(++steps < 1200);
   }
   assert.equal(clock.size, 0);
   assert.deepEqual(controller.snapshot().run, expected);
-  assert.equal(serializeSimulation(params, initial), serializeSimulation(params, fresh()));
+  assert.equal(initial.calendar.observationMonths, 180);
+  assert.equal(initial.calendar.observationMonths * controller.settings.monthMs, 60 * 60 * 1000);
+  // Partial first/last months can have different day counts; allow less than one month.
+  assert.ok(Math.abs(elapsedAt1x - 60 * 60 * 1000) < controller.settings.monthMs);
+  assert.equal(serializeSimulation(params, initial), serializeSimulation(params, fresh(params)));
   controller.dispose();
 });
 
+test("AT02/AT05/AT24: observation reaches the batch RESULT after answering major choices", () => {
+  // Guarantee the answer path is exercised even before natural heavy-event rates are set.
+  const initial = requestEvent(params, fresh(), "EV86");
+  let expected = initial, batches = 0;
+  while (expected.state !== "RESULT") {
+    assert.ok(++batches < 1200, "batch must finish after answering choices");
+    expected = expected.pendingDecision ? answerFirst(expected) : runToEnd(params, expected);
+  }
+  const clock = fakeClock();
+  const attach = initialRun => createObservationController(params, { initialRun,
+    schedule: clock.schedule, cancel: clock.cancel, onError: error => { throw error; } });
+  let controller = attach(initial), steps = 0;
+  controller.start();
+  try {
+    while (controller.snapshot().run.state !== "RESULT") {
+      assert.ok(++steps < 2400, "observation must finish after answering choices");
+      const { run } = controller.snapshot();
+      if (run.pendingDecision) {
+        assert.equal(clock.size, 0, "unanswered choices stop the clock");
+        controller.resume();
+        assert.equal(clock.size, 0);
+        controller.dispose();
+        controller = attach(answerFirst(run));
+        controller.start();
+        continue;
+      }
+      assert.equal(clock.size, 1, "one boundary is scheduled after choices are answered");
+      clock.tick();
+    }
+    assert.equal(clock.size, 0);
+    assert.ok(controller.snapshot().run.choiceHistory.length > 0);
+    assert.deepEqual(controller.snapshot().run, expected);
+  } finally {
+    controller.dispose();
+  }
+});
+
 test("AT05/AT24: pauses cancel stale callbacks, hiding never catches up, and details require resume", () => {
-  const { controller, clock } = observed();
+  const params = clockParams;
+  const { controller, clock } = observed(fresh(params), params);
   const firstDelay = clock.lastDelay, initial = controller.snapshot().run;
   const stale = clock.callback;
   controller.setSpeed(4);
