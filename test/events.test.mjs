@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { loadParams, validateParams, getFamilyEventRules, ABILITY_AXES } from "../src/params.js";
+import { loadParams, validateParams, getFamilyEventRules, getHeavyEventRules, RECURRENT_HEAVY_EVENT_IDS, ABILITY_AXES } from "../src/params.js";
 import { addDays, addMonths } from "../src/calendar.js";
-import { HEAVY_EVENT_IDS, SUPPORT_CARD, eventWeight } from "../src/events.js";
+import { HEAVY_EVENT_IDS, SUPPORT_CARD, eventWeight, offerEvent, advanceEvents, resolveEventChoice } from "../src/events.js";
 import { advanceRelationshipWeek, applyFamilyChoice, familyEligible } from "../src/household.js";
 import { createSimulation, runToEnd, advanceToBoundary, requestEvent, answerDecision, setPaused,
   serializeSimulation, loadSimulation, respondToRelationshipWarning } from "../src/sim.js";
@@ -20,6 +20,8 @@ function initial(seed = "family", role = "self") {
 }
 function tune(mutator = () => {}) {
   const p = structuredClone(params);
+  // Isolate family/scheduling fixtures; shipped-weight integration is separate.
+  for (const row of p.collections.events) if (RECURRENT_HEAVY_EVENT_IDS.includes(row.id)) row.weight.value = 0;
   const period = p.collections.provisionalValues.find(row => row.columns.項目 === "観察期間");
   period.columns["暫定値・扱い"] = period.columns["暫定値・扱い"].replace(/から\d+暦月/u, "から36暦月");
   mutator(p);
@@ -77,14 +79,15 @@ test("AT06/AT14: simultaneous monthly candidates resume in saved order without r
   assert.deepEqual(runToEnd(p, split), pending);
 });
 
-test("AT135 component: all heavy definitions retain unresolved weights and always carry a fixed support card", () => {
+test("AT116/AT135: all heavy definitions have configured chances and always carry a fixed support card", () => {
   const base = createSimulation(params, initial());
   for (const id of HEAVY_EVENT_IDS) {
     const run = structuredClone(base);
     if (id === "EV95") Object.assign(run.household.relationships[0], { strain: 90, warnings: 2 });
     else {
-      assert.equal(eventWeight(params, id, run), null);
-      assert.ok(run.eventState.unresolvedWeights.includes(id));
+      assert.equal(eventWeight(params, id, run), getHeavyEventRules(params)[id].chance);
+      assert.ok(eventWeight(params, id, run) > 0);
+      assert.ok(!run.eventState.unresolvedWeights.includes(id));
     }
     const pending = requestEvent(params, run, id, id === "EV95" ? "partner-1" : null);
     assert.deepEqual(pending.pendingDecision.supportCard, SUPPORT_CARD);
@@ -103,6 +106,220 @@ test("AT135 component: numeric heavy weights use identical seeded selection rega
   assert.deepEqual(left.eventState, right.eventState);
   assert.equal(left.eventState.queue.length, 4);
   assert.equal(left.pendingDecision.supportCard.text, SUPPORT_CARD.text);
+});
+
+test("AT15/AT135: heavy rules read numeric chances and strict recurrence grammar from params", () => {
+  const expected = { EV14: [0.01, 12], EV25: [0.01, 12], EV86: [0.015, 12], EV87: [0.005, 24], EV88: [0.015, 6] };
+  const rules = getHeavyEventRules(params);
+  for (const [id, [chance, intervalMonths]] of Object.entries(expected)) {
+    assert.deepEqual(rules[id], { chance, intervalMonths });
+    const row = params.collections.events.find(row => row.id === id);
+    assert.equal(row.weight.evidenceClass, "仮置き");
+    assert.match(row.weight.basis, /統計値ではない/u);
+    for (const invalid of [null, -0.1, 1.1, "0.01", NaN]) {
+      assert.throws(() => tune(p => { p.collections.events.find(e => e.id === id).weight.value = invalid; }));
+    }
+    for (const invalid of [null, "未設定", "再発間隔0か月", "再発間隔1.5か月", "再発間隔-1か月", "再発間隔12か月 extra"]) {
+      assert.throws(() => tune(p => { p.collections.events.find(e => e.id === id).weight.text = invalid; }));
+    }
+  }
+  const p = tune(p => {
+    const row = p.collections.events.find(e => e.id === "EV86");
+    row.weight.value = 0.2; row.weight.text = "再発間隔7か月";
+  });
+  assert.deepEqual(getHeavyEventRules(p).EV86, { chance: 0.2, intervalMonths: 7 });
+  assert.equal(eventWeight(p, "EV86", createSimulation(p, initial())), 0.2);
+  assert.deepEqual(getFamilyEventRules(p).ev95, getFamilyEventRules(params).ev95);
+});
+
+test("AT15/AT135: heavy recurrence grammar rejects trailing line terminators", () => {
+  for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+    const original = params.collections.events.find(row => row.id === id).weight.text;
+    for (const ending of ["\n", "\r", "\r\n", "\u2028", "\u2029"]) {
+      const p = structuredClone(params);
+      p.collections.events.find(row => row.id === id).weight.text = original + ending;
+      assert.throws(() => getHeavyEventRules(p), /heavy event rule/);
+      assert.throws(() => validateParams(p), /heavy event rule/);
+    }
+  }
+});
+
+test("AT135: heavy monthly chances do not trigger on weekly boundaries after cooldown expires", () => {
+  for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+    const p = tune(p => {
+      p.collections.events.find(row => row.id === id).weight.value = 1;
+      p.collections.events.find(row => row.id === "EV93").weight.value = 0;
+    });
+    const run = createSimulation(p, initial());
+    const interval = getHeavyEventRules(p)[id].intervalMonths;
+    offerEvent(p, run, id);
+    resolveEventChoice(p, run, run.pendingDecision.id, "option-2");
+    const readyDate = addMonths(run.calendar.currentDate, interval);
+    run.calendar.currentDate = readyDate;
+    run.calendar.weekIndex++;
+    advanceEvents(p, run, { week: true });
+    assert.equal(run.pendingDecision, null, `${id} must wait for a monthly draw`);
+    assert.equal(run.events.filter(row => row.kind === "catalog" && row.eventId === id).length, 1);
+
+    run.calendar.currentDate = addMonths(`${readyDate.slice(0, 7)}-01`, 1);
+    advanceEvents(p, run, { month: true });
+    assert.equal(run.pendingDecision.eventId, id);
+    assert.equal(run.pendingDecision.date, run.calendar.currentDate);
+    assert.deepEqual(run.pendingDecision.supportCard, SUPPORT_CARD);
+    assert.equal(run.events.filter(row => row.kind === "catalog" && row.eventId === id).length, 2);
+  }
+});
+
+test("AT135: every heavy ID respects its recurrence boundary, month-end clipping and unrelated history", () => {
+  for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+    const p = tune(p => {
+      const row = p.collections.events.find(e => e.id === id);
+      row.weight.value = 1; row.weight.text = "再発間隔1か月";
+      p.collections.events.find(e => e.id === "EV93").weight.value = 0;
+    });
+    const input = initial(); input.runSetupTemplate.startDate = "2020-01-31";
+    const pending = requestEvent(p, createSimulation(p, input), id);
+    const answered = choose(p, pending, 0);
+    assert.throws(() => requestEvent(p, answered, id), /ineligible/);
+    const other = RECURRENT_HEAVY_EVENT_IDS.find(other => other !== id);
+    assert.equal(requestEvent(p, answered, other).pendingDecision.eventId, other);
+    // Isolate event eligibility from weekly scheduling; duplicate non-catalog
+    // records and another ID must not postpone this ID's recurrence.
+    answered.events.push({ kind: "rediscovery", eventId: id, date: "2020-02-28" });
+    for (const date of ["2020-02-28", "2020-02-29"]) {
+      const run = structuredClone(answered);
+      run.calendar.currentDate = date;
+      advanceEvents(p, run, { month: true });
+      assert.equal(run.pendingDecision?.eventId ?? null, date === "2020-02-29" ? id : null);
+    }
+  }
+});
+
+test("AT06/AT135: shipped recurrence intervals restart after each occurrence and survive restored history", () => {
+  const rules = getHeavyEventRules(params);
+  for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+    const first = choose(params, requestEvent(params, createSimulation(params, initial()), id), 1);
+    const loaded = loadSimulation(params, serializeSimulation(params, first));
+    assert.equal(loaded.ok, true, loaded.error);
+    const run = loaded.run;
+    let previousDate = run.calendar.currentDate;
+    // Exercise event eligibility directly at exact dates, without a monthly
+    // random draw obscuring whether the shipped cooldown has expired.
+    for (let occurrence = 2; occurrence <= 3; occurrence++) {
+      const readyDate = addMonths(previousDate, rules[id].intervalMonths);
+      run.calendar.currentDate = addDays(readyDate, -1);
+      const before = structuredClone(run);
+      assert.throws(() => offerEvent(params, run, id), /ineligible/);
+      assert.deepEqual(run, before, "rejected recurrence must not mutate history or choices");
+      run.calendar.currentDate = readyDate;
+      offerEvent(params, run, id);
+      assert.equal(run.pendingDecision.eventRecordId, `event-${id}-${occurrence}`);
+      assert.deepEqual(run.pendingDecision.supportCard, SUPPORT_CARD);
+      resolveEventChoice(params, run, run.pendingDecision.id, run.pendingDecision.options[1].id);
+      assert.equal(run.events.filter(record => record.kind === "catalog" && record.eventId === id).length, occurrence);
+      previousDate = readyDate;
+    }
+  }
+});
+
+test("AT135: shipped cooldowns clip leap-day and month-end anniversaries", () => {
+  const cases = [
+    ["2020-02-29", { 6: "2020-08-29", 12: "2021-02-28", 24: "2022-02-28" }],
+    ["2020-08-31", { 6: "2021-02-28", 12: "2021-08-31", 24: "2022-08-31" }],
+  ];
+  const rules = getHeavyEventRules(params);
+  for (const [startDate, anniversaries] of cases) {
+    for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+      const input = initial();
+      input.runSetupTemplate.startDate = startDate;
+      const first = choose(params, requestEvent(params, createSimulation(params, input), id), 1);
+      const loaded = loadSimulation(params, serializeSimulation(params, first));
+      assert.equal(loaded.ok, true, loaded.error);
+      const run = loaded.run;
+      const readyDate = anniversaries[rules[id].intervalMonths];
+      assert.ok(readyDate, `missing anniversary fixture for ${id}`);
+      run.calendar.currentDate = addDays(readyDate, -1);
+      assert.throws(() => offerEvent(params, run, id), /ineligible/);
+      run.calendar.currentDate = readyDate;
+      offerEvent(params, run, id);
+      assert.equal(run.pendingDecision.eventId, id);
+      assert.equal(run.pendingDecision.date, readyDate);
+      assert.deepEqual(run.pendingDecision.supportCard, SUPPORT_CARD);
+    }
+  }
+});
+
+test("AT06/AT14/AT135: legacy unresolved lists and heavy pending choices load without bypassing recurrence", () => {
+  for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+    const pending = requestEvent(params, createSimulation(params, initial()), id);
+    pending.eventState.unresolvedWeights = params.collections.events
+      .filter(row => !["EV93", "EV94", "EV95", "EV96"].includes(row.id) &&
+        (row.weight.value === null || RECURRENT_HEAVY_EVENT_IDS.includes(row.id))).map(row => row.id);
+    const loaded = loadSimulation(params, JSON.stringify(pending));
+    assert.equal(loaded.ok, true, loaded.error);
+    const answered = choose(params, loaded.run, 0);
+    assert.deepEqual(answered, choose(params, pending, 0));
+    const resumed = loadSimulation(params, serializeSimulation(params, answered));
+    assert.equal(resumed.ok, true, resumed.error);
+    assert.throws(() => requestEvent(params, resumed.run, id), /ineligible/);
+    assert.ok(!createSimulation(params, initial()).eventState.unresolvedWeights.includes(id));
+  }
+});
+
+test("AT06/AT135: restored queues skip duplicate heavy candidates without dropping another ID", () => {
+  for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+    const other = RECURRENT_HEAVY_EVENT_IDS.find(candidate => candidate !== id);
+    const pending = requestEvent(params, createSimulation(params, initial()), id);
+    pending.eventState.queue.push(
+      { eventId: id, relationshipId: null },
+      { eventId: other, relationshipId: null },
+      { eventId: id, relationshipId: null }
+    );
+    const loaded = loadSimulation(params, serializeSimulation(params, pending));
+    assert.equal(loaded.ok, true, loaded.error);
+    const next = choose(params, loaded.run, 1);
+    assert.deepEqual(next, choose(params, pending, 1));
+    assert.equal(next.pendingDecision.eventId, other);
+    assert.deepEqual(next.pendingDecision.supportCard, SUPPORT_CARD);
+    const finished = choose(params, next, 1);
+    assert.equal(finished.pendingDecision, null);
+    assert.equal(finished.state, "RUNNING");
+    assert.deepEqual(finished.eventState.queue, []);
+    assert.deepEqual(finished.events.filter(record => record.kind === "catalog").map(record => record.eventId), [id, other]);
+    assert.equal(finished.choiceHistory.length, 2);
+    assert.equal(loadSimulation(params, serializeSimulation(params, finished)).ok, true);
+  }
+});
+
+test("AT116/AT135: shipped monthly chances naturally produce every heavy event with deterministic support and spacing", () => {
+  const seen = new Set(), rules = getHeavyEventRules(params);
+  function play(seed, displaySettings) {
+    const input = initial(seed);
+    input.personTemplate.household = { maritalStatus: "single", children: [], birthRole: "not_applicable" };
+    const run = createSimulation(params, input);
+    run.displaySettings = displaySettings;
+    for (let month = 1; month <= 180; month++) {
+      run.calendar.currentDate = addMonths("2020-01-01", month);
+      advanceEvents(params, run, { month: true });
+      while (run.pendingDecision) {
+        assert.deepEqual(run.pendingDecision.supportCard, SUPPORT_CARD);
+        resolveEventChoice(params, run, run.pendingDecision.id, run.pendingDecision.options[0].id);
+      }
+    }
+    return run.events.filter(row => row.kind === "catalog");
+  }
+  for (let seed = 0; seed < 12; seed++) {
+    const records = play(seed, {});
+    assert.deepEqual(records, play(seed, { heavyEvents: "none", speed: 4 }));
+    const last = {};
+    for (const record of records) {
+      seen.add(record.eventId);
+      assert.deepEqual(record.supportCard, SUPPORT_CARD);
+      if (last[record.eventId]) assert.ok(record.date >= addMonths(last[record.eventId], rules[record.eventId].intervalMonths));
+      last[record.eventId] = record.date;
+    }
+  }
+  assert.deepEqual([...seen].sort(), [...RECURRENT_HEAVY_EVENT_IDS].sort());
 });
 
 test("AT140: all EV93 choices are available and 1000 declines include non-worsening outcomes", () => {

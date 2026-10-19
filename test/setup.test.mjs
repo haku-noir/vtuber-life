@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { loadParams } from "../src/params.js";
 import { ageWeights, generateStartDate, generatePerson, generateHousehold } from "../src/person.js";
 import { createSetup, importSeedCode, compatibilityWeight, LOCK_GROUPS } from "../src/setup.js";
-import { createSimulation, advanceToBoundary, runToEnd } from "../src/sim.js";
+import { createSimulation, advanceToBoundary, runToEnd, answerDecision } from "../src/sim.js";
 import { createRng } from "../src/rng.js";
 import { encodeSeedCode, decodeSeedCode, SEED_VERSIONS, SEED_FIELDS } from "../src/seedcode.js";
 
@@ -54,9 +54,19 @@ test("AT01/AT02/AT91 setup: QS1 is ready and accepted by simulation in every sta
   assert.deepEqual([...years].sort(), Array.from({ length: 11 }, (_, i) => 2016 + i));
 });
 
-test("AT02/AT03 setup integration: identical QS1 seeds run to the observation limit without input", () => {
-  const run = () => runToEnd(params, createSimulation(params, { seed: "m10-end",
-    ...createSetup(params, { seed: "m10-end" }).snapshot() }));
+test("AT02/AT03 setup integration: identical QS1 seeds reach the observation limit with major answers", () => {
+  const run = () => {
+    let result = createSimulation(params, { seed: "m10-end",
+      ...createSetup(params, { seed: "m10-end" }).snapshot() });
+    for (let n = 0; n < 200 && result.state !== "RESULT"; n++) {
+      result = runToEnd(params, result);
+      if (result.pendingDecision) {
+        const pending = result.pendingDecision;
+        result = answerDecision(params, result, pending.id, pending.options[0].id);
+      }
+    }
+    return result;
+  };
   const a = run(), b = run();
   assert.deepEqual(a, b);
   assert.equal(a.state, "RESULT");

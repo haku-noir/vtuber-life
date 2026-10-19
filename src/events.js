@@ -1,6 +1,7 @@
 import { createRng } from "./rng.js";
 import { finishActivity } from "./epilogue.js";
-import { getCandidates, getFamilyEventRules } from "./params.js";
+import { getCandidates, getFamilyEventRules, getHeavyEventRules, RECURRENT_HEAVY_EVENT_IDS } from "./params.js";
+import { addMonths } from "./calendar.js";
 import { advanceFamilyDates, advanceRelationshipWeek, applyFamilyChoice, birthRoleWording,
   familyEligible, recordHousehold } from "./household.js";
 
@@ -19,7 +20,15 @@ export function eventWeight(params, id, run) {
   if (id === "EV94") return r.ev94.chance;
   if (id === "EV95") return r.ev95.chance;
   if (id === "EV96") return 1;
+  if (RECURRENT_HEAVY_EVENT_IDS.includes(id)) return getHeavyEventRules(params)[id].chance;
   return row.weight.value; // null remains unresolved, never zero or an invented default.
+}
+
+function recurrenceReady(params, run, eventId) {
+  if (!RECURRENT_HEAVY_EVENT_IDS.includes(eventId)) return true;
+  const { intervalMonths } = getHeavyEventRules(params)[eventId];
+  return !run.events.some(record => record.kind === "catalog" && record.eventId === eventId &&
+    run.calendar.currentDate < addMonths(record.date, intervalMonths));
 }
 
 export function createEventState(params, run) {
@@ -56,7 +65,7 @@ function eligible(params, run, eventId, relationshipId) {
 export function offerEvent(params, run, eventId, relationshipId = null) {
   if (run.pendingDecision || run.state !== "RUNNING") fail("run must be running");
   const row = definition(params, eventId);
-  if (!row || !eligible(params, run, eventId, relationshipId)) fail("ineligible event");
+  if (!row || !eligible(params, run, eventId, relationshipId) || !recurrenceReady(params, run, eventId)) fail("ineligible event");
   const count = run.events.filter(event => event.eventId === eventId && event.kind === "catalog").length;
   const id = `event-${eventId}-${count + 1}`;
   const record = { id, eventId, kind: "catalog", date: run.calendar.currentDate, relationshipId,
@@ -82,7 +91,7 @@ export function offerEvent(params, run, eventId, relationshipId = null) {
 export function drainEventQueue(params, run) {
   while (!run.pendingDecision && run.eventState.queue.length) {
     const candidate = run.eventState.queue.shift();
-    if (eligible(params, run, candidate.eventId, candidate.relationshipId))
+    if (eligible(params, run, candidate.eventId, candidate.relationshipId) && recurrenceReady(params, run, candidate.eventId))
       offerEvent(params, run, candidate.eventId, candidate.relationshipId);
   }
   if (!run.pendingDecision) run.stage = "boundary";
@@ -113,7 +122,7 @@ export function advanceEvents(params, run, { week = false, month = false } = {})
       if (row.id === "EV94" || row.id === "EV96") continue;
       const targets = row.id === "EV95" ? h.relationships.map(relation => relation.id) : [null];
       for (const relationshipId of targets) {
-        if (!eligible(params, run, row.id, relationshipId)) continue;
+        if (!eligible(params, run, row.id, relationshipId) || !recurrenceReady(params, run, row.id)) continue;
         const weight = eventWeight(params, row.id, run);
         if (weight === null) continue;
         if (weight < 0 || weight > 1 || !Number.isFinite(weight)) fail("monthly probability");
@@ -175,7 +184,11 @@ export function validateEventState(params, run) {
       !/^\d{4}-\d{2}$/.test(s.lastMonth) || s.lastMonth > run.calendar.currentDate.slice(0, 7) ||
       !Array.isArray(s.queue) || !Array.isArray(s.unresolvedWeights) || typeof s.graduationRequested !== "boolean") fail("cursor");
   const expected = createEventState(params, run).unresolvedWeights;
-  if (JSON.stringify(expected) !== JSON.stringify(s.unresolvedWeights)) fail("unresolved weights");
+  // These five entries were previously unresolved. Accept that exact historical
+  // diagnostic list without adding save fields or changing the saved history.
+  const legacy = getCandidates(params, "events").filter(row => !familyIds.includes(row.id) &&
+    (row.weight.value === null || RECURRENT_HEAVY_EVENT_IDS.includes(row.id))).map(row => row.id);
+  if (![expected, legacy].some(list => JSON.stringify(list) === JSON.stringify(s.unresolvedWeights))) fail("unresolved weights");
   for (const row of s.queue) if (!definition(params, row.eventId) ||
       (row.relationshipId !== null && !run.household.relationships.some(relation => relation.id === row.relationshipId))) fail("queued event");
   for (const record of run.events.filter(row => row.kind === "catalog")) {

@@ -1,14 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { loadParams, validateParams, ABILITY_AXES } from "../src/params.js";
+import { loadParams, validateParams, RECURRENT_HEAVY_EVENT_IDS, ABILITY_AXES } from "../src/params.js";
 import { addDays, addMonths, daysBetween } from "../src/calendar.js";
 import { validateLedger } from "../src/save.js";
-import { createSimulation, advanceToBoundary, runToEnd, setPaused, serializeSimulation, loadSimulation } from "../src/sim.js";
+import { createSimulation, advanceToBoundary, runToEnd, answerDecision, setPaused, serializeSimulation, loadSimulation } from "../src/sim.js";
 
 const params = await loadParams(url => readFile(url, "utf8"));
 function configured(months = 3, mutate = () => {}) {
   const p = structuredClone(params);
+  // These fixtures isolate activity/economy; full-length lives use shipped odds.
+  for (const row of p.collections.events) if (RECURRENT_HEAVY_EVENT_IDS.includes(row.id)) row.weight.value = 0;
   const row = p.collections.provisionalValues.find(row => row.columns.項目 === "観察期間");
   row.columns["暫定値・扱い"] = row.columns["暫定値・扱い"].replace(/から\d+暦月/, `から${months}暦月`);
   mutate(p.collections.simBalance);
@@ -23,10 +25,15 @@ function initial(format = "video", startDate = "2020-01-29") {
   }, runSetupTemplate: { startDate, policy: { format, liveMode: format === "stream" ? "regular" : "off", voiceTraining: true } } };
 }
 
-test("AT03/AT07/AT23: video and streaming lives reach RESULT at 180 calendar months without input", () => {
+test("AT03/AT07/AT23: video and streaming lives reach RESULT at 180 calendar months with only major answers", () => {
   for (const format of ["video", "stream"]) {
     const input = initial(format), original = structuredClone(input);
-    const start = createSimulation(params, input), end = runToEnd(params, start);
+    const start = createSimulation(params, input);
+    let end = start;
+    for (let n = 0; n < 200 && end.state !== "RESULT"; n++) {
+      end = runToEnd(params, end);
+      if (end.pendingDecision) end = answerDecision(params, end, end.pendingDecision.id, end.pendingDecision.options[0].id);
+    }
     assert.deepEqual(input, original);
     assert.equal(start.calendar.currentDate, input.runSetupTemplate.startDate);
     assert.equal(end.state, "RESULT");

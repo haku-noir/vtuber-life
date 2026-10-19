@@ -107,7 +107,29 @@ export function validateParams(data) {
   getObservationMonths(data);
   getSimBalance(data);
   getFamilyEventRules(data);
+  getHeavyEventRules(data);
   return data;
+}
+
+export const RECURRENT_HEAVY_EVENT_IDS = Object.freeze(["EV14", "EV25", "EV86", "EV87", "EV88"]);
+const heavyCache = new WeakMap();
+// Monthly chances are numeric; recurrence text has a fixed, documented grammar.
+export function getHeavyEventRules(params) {
+  if (Object.isFrozen(params) && heavyCache.has(params)) return heavyCache.get(params);
+  const rules = {};
+  for (const id of RECURRENT_HEAVY_EVENT_IDS) {
+    const weight = params.collections.events.find(row => row.id === id)?.weight;
+    const match = typeof weight?.text === "string" && /^再発間隔([1-9]\d*)か月$/u.exec(weight.text);
+    // JavaScript's $ also matches before a final line terminator; require the
+    // entire text so the documented fixed grammar rejects trailing newlines.
+    const intervalMonths = match && match[0] === weight.text ? Number(match[1]) : NaN;
+    if (weight?.evidenceClass !== "仮置き" || typeof weight.value !== "number" ||
+        !Number.isFinite(weight.value) || weight.value < 0 || weight.value > 1 ||
+        !Number.isSafeInteger(intervalMonths)) fail(`heavy event rule ${id}`);
+    rules[id] = { chance: weight.value, intervalMonths };
+  }
+  if (Object.isFrozen(params)) heavyCache.set(params, deepFreeze(rules));
+  return rules;
 }
 
 const familyCache = new WeakMap();

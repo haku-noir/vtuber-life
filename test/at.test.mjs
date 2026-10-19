@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
-import { loadParams } from "../src/params.js";
+import { loadParams, getHeavyEventRules } from "../src/params.js";
 import { createSetup } from "../src/setup.js";
+import { SUPPORT_CARD } from "../src/events.js";
+import { addMonths } from "../src/calendar.js";
 import { createSimulation, runToEnd, advanceToBoundary, answerDecision,
   serializeSimulation, loadSimulation, endActivity, rebirth } from "../src/sim.js";
 import { createObservationController } from "../web/app.js";
@@ -105,8 +107,9 @@ function restore(run) {
   return result.run;
 }
 
-// Test driver only: selects the first offered major option, never changes the
-// product's default autoMajorChoices=false or invents weekly inputs/events.
+// Test driver only: prefers a non-rest response for heavy events so the family/return
+// path remains observable; all other major choices use the first option.
+// The product's default autoMajorChoices=false is never changed.
 function finish(initial, restoring = false) {
   let run = initial;
   const decisions = [];
@@ -119,8 +122,11 @@ function finish(initial, restoring = false) {
       assert.ok(pending && /^EV\d+$/.test(pending.eventId), "only catalog major choices may wait");
       assert.equal(runToEnd(params, run), run, "unanswered choice must stop time");
       if (restoring) run = restore(run);
-      decisions.push({ id: pending.id, eventId: pending.eventId, option: pending.options[0].id });
-      run = answerDecision(params, run, pending.id, pending.options[0].id);
+      const option = getHeavyEventRules(params)[pending.eventId]
+        ? pending.options.find(option => !/休む|休止/u.test(option.label)) ?? pending.options[0]
+        : pending.options[0];
+      decisions.push({ id: pending.id, eventId: pending.eventId, option: option.id });
+      run = answerDecision(params, run, pending.id, option.id);
     } else {
       const before = run.calendar.currentDate, state = run.state;
       run = runToEnd(params, run, restoring ? 96 : Number.MAX_SAFE_INTEGER);
@@ -140,6 +146,14 @@ test("AT03/AT06/AT14/AT17/AT91 partial: fixed QS1 family life finishes offline; 
   const baseline = finish(initial);
   assert.ok(baseline.decisions.some(row => row.eventId === "EV93"), "exercise an actual family choice");
   assert.ok(baseline.decisions.some(row => row.eventId === "EV96"), "exercise return from leave");
+  const rules = getHeavyEventRules(params), last = {};
+  const heavy = baseline.run.events.filter(row => row.kind === "catalog" && rules[row.eventId]);
+  assert.ok(heavy.length > 0, "exercise natural heavy events with shipped chances");
+  for (const record of heavy) {
+    assert.deepEqual(record.supportCard, SUPPORT_CARD);
+    if (last[record.eventId]) assert.ok(record.date >= addMonths(last[record.eventId], rules[record.eventId].intervalMonths));
+    last[record.eventId] = record.date;
+  }
   assert.equal(baseline.run.calendar.currentDate, baseline.run.calendar.endDate);
   assert.equal(baseline.run.lifeSnapshot.reason, "observation-limit");
   assert.equal(baseline.run.epilogue, null);
@@ -156,7 +170,7 @@ test("AT03/AT06/AT14/AT17/AT91 partial: fixed QS1 family life finishes offline; 
   assert.equal(serializeSimulation(params, initial), before, "driver must not mutate the initial life");
 });
 
-test("AT03/AT17/AT91 partial: one QS1 controller start reaches RESULT without any further input", () => {
+test("AT03/AT17/AT91 partial: one QS1 controller start progresses automatically until a natural major choice", () => {
   let sequence = 0, ticks = 0;
   const jobs = new Map();
   const controller = createObservationController(params, {
@@ -172,7 +186,7 @@ test("AT03/AT17/AT91 partial: one QS1 controller start reaches RESULT without an
   try {
     assert.equal(controller.snapshot().run.state, "RUNNING");
     controller.start(); // The production QS1 start action; fake time only.
-    while (controller.snapshot().run.state !== "RESULT") {
+    while (controller.snapshot().run.state === "RUNNING") {
       assert.equal(jobs.size, 1, "automatic clock must stay armed");
       assert.ok(++ticks <= 1200, "bounded 180-month observation");
       const [id, callback] = jobs.entries().next().value;
@@ -180,9 +194,10 @@ test("AT03/AT17/AT91 partial: one QS1 controller start reaches RESULT without an
       callback();
     }
     const { run } = controller.snapshot();
-    assert.equal(run.calendar.currentDate, run.calendar.endDate);
-    assert.equal(run.lifeSnapshot.reason, "observation-limit");
-    assert.equal(run.pendingDecision, null);
+    assert.equal(run.state, "CHOICE");
+    assert.ok(run.calendar.currentDate < run.calendar.endDate);
+    assert.ok(run.pendingDecision);
+    assert.strictEqual(runToEnd(params, run), run);
     assert.equal(run.choiceHistory.length, 0);
     assert.equal(jobs.size, 0);
   } finally {
